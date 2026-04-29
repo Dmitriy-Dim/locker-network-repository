@@ -7,7 +7,7 @@ import {sendError} from "../utils/response";
 import {HttpError} from "./HttpError";
 
 
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (err: Error, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ZodError) {
         return sendError(res, 400, "VALIDATION_ERROR", "Validation failed", err.flatten().fieldErrors);
     }

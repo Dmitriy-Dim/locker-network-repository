@@ -269,28 +269,30 @@ Responses:
 - `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
 - `500 Internal Server Error` - projection build failed or unexpected repository/service failure
 
-#### PATCH /api/v1/lockers/admin/boxes/:id/tech-status
+#### PATCH /api/v1/lockers/oper/boxes/:id/tech-status
 
-- Roles: operator, admin
+- Roles: operator
 - Updates locker technical lifecycle state in RDS
 - Keeps `techStatus` field name in the request and response
 - Enqueues updated locker projection to the cache projection queue after the RDS update
 - If `techStatus !== "ACTIVE"`, backend sets `status = null`
 - If `techStatus === "ACTIVE"` and `status == null`, backend sets `status = "AVAILABLE"`
 - The old admin/operator `PATCH /api/v1/lockers/admin/boxes/:id/status` route is no longer published; user runtime status changes are driven by booking flows
+- The old `READY` locker technical status is removed and must not be sent by clients
 
 Request body:
 
 ```json
 {
-  "techStatus": "READY"
+  "techStatus": "ACTIVE"
 }
 ```
 
-Allowed transitions:
+Allowed values:
 
-- `OPERATOR`: `INACTIVE -> READY`, `MAINTENANCE -> READY`
-- `ADMIN`: `READY -> ACTIVE`, `ACTIVE -> MAINTENANCE`, `ACTIVE -> FAULTY`
+```text
+ACTIVE | INACTIVE | MAINTENANCE | FAULTY
+```
 
 Example `200 OK` body:
 

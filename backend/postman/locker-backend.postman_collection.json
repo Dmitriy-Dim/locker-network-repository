@@ -563,46 +563,7 @@
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status READY",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}-box-tech-ready"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"techStatus\": \"READY\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "lockers",
-                "admin",
-                "boxes",
-                "{{lockerBoxId}}",
-                "tech-status"
-              ]
-            }
-          }
-        },
-        {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status ACTIVE",
+          "name": "PATCH /api/v1/lockers/oper/boxes/:id/tech-status ACTIVE",
           "request": {
             "method": "PATCH",
             "header": [
@@ -624,7 +585,7 @@
               "raw": "{\n  \"techStatus\": \"ACTIVE\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/boxes/{{lockerBoxId}}/tech-status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -632,7 +593,7 @@
                 "api",
                 "v1",
                 "lockers",
-                "admin",
+                "oper",
                 "boxes",
                 "{{lockerBoxId}}",
                 "tech-status"
@@ -641,7 +602,7 @@
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status MAINTENANCE",
+          "name": "PATCH /api/v1/lockers/oper/boxes/:id/tech-status MAINTENANCE",
           "request": {
             "method": "PATCH",
             "header": [
@@ -663,7 +624,7 @@
               "raw": "{\n  \"techStatus\": \"MAINTENANCE\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/boxes/{{lockerBoxId}}/tech-status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -671,7 +632,7 @@
                 "api",
                 "v1",
                 "lockers",
-                "admin",
+                "oper",
                 "boxes",
                 "{{lockerBoxId}}",
                 "tech-status"
@@ -680,7 +641,7 @@
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status FAULTY",
+          "name": "PATCH /api/v1/lockers/oper/boxes/:id/tech-status FAULTY",
           "request": {
             "method": "PATCH",
             "header": [
@@ -702,7 +663,7 @@
               "raw": "{\n  \"techStatus\": \"FAULTY\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/boxes/{{lockerBoxId}}/tech-status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -710,7 +671,7 @@
                 "api",
                 "v1",
                 "lockers",
-                "admin",
+                "oper",
                 "boxes",
                 "{{lockerBoxId}}",
                 "tech-status"
