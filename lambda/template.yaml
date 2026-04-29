@@ -170,13 +170,16 @@ Resources:
       FunctionName: !Sub locker-${Environment}-booking-ttl-cleanup
       Handler: dist/functions/booking/bookingTtlCleanup.handler
       CodeUri: .
-      Description: Releases locker when unpaid booking expires
+      Description: Handles expired bookings (unpaid and rental overdue)
       Environment:
         Variables:
           LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+          BOOKING_TABLE: !Ref BookingTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LockerCacheTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BookingTable
       Events:
         DynamoDBStream:
           Type: DynamoDB

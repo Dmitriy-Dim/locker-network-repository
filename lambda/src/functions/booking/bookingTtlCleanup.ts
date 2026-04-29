@@ -1,5 +1,7 @@
 import { DynamoDBStreamEvent } from 'aws-lambda';
-import { updateLockerStatus } from '../../db/dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
+import { AttributeValue } from '@aws-sdk/client-dynamodb';
+import { updateLockerStatus, createBooking } from '../../db/dynamodb';
 
 export const handler = async (event: DynamoDBStreamEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -12,22 +14,50 @@ export const handler = async (event: DynamoDBStreamEvent): Promise<void> => {
     const status = oldImage.status?.S;
     const bookingId = oldImage.bookingId?.S;
 
-    // Only release if booking was still PENDING (unpaid)
-    if (status !== 'PENDING' || !lockerBoxId) continue;
+    if (!lockerBoxId) continue;
 
-    console.log(JSON.stringify({
-      action: 'BOOKING_TTL_EXPIRED',
-      bookingId,
-      lockerBoxId,
-      previousStatus: status,
-    }));
+    if (status === 'PENDING') {
+      // Existing logic: unpaid booking expired → release locker
+      console.log(JSON.stringify({
+        action: 'BOOKING_TTL_EXPIRED',
+        bookingId,
+        lockerBoxId,
+        previousStatus: status,
+      }));
 
-    await updateLockerStatus(lockerBoxId, 'AVAILABLE');
+      await updateLockerStatus(lockerBoxId, 'AVAILABLE');
 
-    console.log(JSON.stringify({
-      action: 'LOCKER_RELEASED',
-      bookingId,
-      lockerBoxId,
-    }));
+      console.log(JSON.stringify({
+        action: 'LOCKER_RELEASED',
+        bookingId,
+        lockerBoxId,
+      }));
+    } else if (status === 'ACTIVE') {
+      // Rental expired: customer didn't pick up items in time
+      console.log(JSON.stringify({
+        action: 'RENTAL_EXPIRED',
+        bookingId,
+        lockerBoxId,
+        previousStatus: status,
+      }));
+
+      await updateLockerStatus(lockerBoxId, 'EXPIRED');
+
+      // Re-insert booking with EXPIRED status so it remains queryable
+      const booking = unmarshall(oldImage as Record<string, AttributeValue>);
+      await createBooking({
+        ...booking,
+        status: 'EXPIRED',
+        ttl: 0,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log(JSON.stringify({
+        action: 'BOOKING_REINSERTED',
+        bookingId,
+        lockerBoxId,
+        newStatus: 'EXPIRED',
+      }));
+    }
   }
 };

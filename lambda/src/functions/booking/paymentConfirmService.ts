@@ -84,7 +84,7 @@ export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Prom
     providerPaymentId,
     paymentConfirmedAt: confirmedAt,
     updatedAt: confirmedAt,
-    ttl: 0,
+    ttl: Math.floor(new Date(booking.expectedEndTime).getTime() / 1000),
   });
  
   // 7. Update locker: RESERVED → OCCUPIED
