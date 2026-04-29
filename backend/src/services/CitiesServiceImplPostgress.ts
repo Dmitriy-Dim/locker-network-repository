@@ -94,6 +94,15 @@ export class CitiesServiceImplPostgres {
         )
 
     }
+
+
+
+    async deleteCities(req: Request, res: Response) {
+        return Promise.resolve(undefined);
+    }
+
+
+
 }
 
 export const citiesService = new CitiesServiceImplPostgres();
