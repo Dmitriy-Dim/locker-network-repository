@@ -4,6 +4,8 @@ export enum OperationType {
   BOOKING_INIT = 'BOOKING_INIT',
   PAYMENT_CONFIRM = 'PAYMENT_CONFIRM',
   BOOKING_EXTEND = 'BOOKING_EXTEND',
+  LOCKER_OPEN = 'LOCKER_OPEN',
+  LOCKER_CLOSE = 'LOCKER_CLOSE',
 }
 
 export enum OperationStatus {
@@ -30,4 +32,19 @@ export interface OperationRecord {
   type: OperationType;
   timestamp: string;
   errorMessage?: string;
+}
+
+export interface LockerCommandPayload {
+  userId: string;
+  bookingId: string;
+  lockerBoxId: string;
+  stationId: string;
+  clientRequestId: string;
+  requestedAt: string;
+}
+
+export interface LockerCommand {
+  operationId: string;
+  type: OperationType.LOCKER_OPEN | OperationType.LOCKER_CLOSE;
+  payload: LockerCommandPayload;
 }

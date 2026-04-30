@@ -1,41 +1,69 @@
 # Locker Network — Lambda Functions
 
-Serverless functions for the locker rental booking system. Handles synchronous health checks via API Gateway and asynchronous operations via SQS + DynamoDB.
+Serverless functions for the locker rental system. Handles synchronous health checks via API Gateway and asynchronous operations via SQS + DynamoDB.
 
 ## Architecture
 
-### Synchronous (Health Check)
+### Synchronous
 
 ```
-FE → GET /health → API Gateway → HealthCheck Lambda → response
+Client → GET /health → API Gateway → HealthCheckFunction → JSON response
 ```
 
-### Asynchronous (Operations)
+### Asynchronous (SQS → DynamoDB polling)
 
 ```
-FE → POST /operations/health → Gateway (backend)
-  │
-  ├── 1. Write to DynamoDB: { operationId, status: PENDING }
-  ├── 2. Send command to SQS: { operationId, type: HEALTH_CHECK }
-  └── 3. Respond immediately: { operationId, operationStatus: PENDING }
+Backend
+  ├── 1. Write to OperationsTable: { operationId, status: PENDING }
+  ├── 2. Send command to SQS OperationsQueue
+  └── 3. Return 202: { operationId }
 
-SQS → CommandHandler Lambda
-  │
-  ├── Update DynamoDB: status → PROCESSING
-  ├── Route by type → LambdaHealthService
-  └── Update DynamoDB: status → SUCCESS
+SQS → CommandHandlerFunction
+  ├── Update OperationsTable: status → PROCESSING
+  ├── Route by command type → service handler
+  └── Update OperationsTable: status → SUCCESS | FAILED (with result payload)
 
-FE polls GET /operations/:id → reads status from DynamoDB
+Frontend polls GET /operations/:id until status ≠ PENDING/PROCESSING
+```
+
+### Locker Open / Close flow
+
+```
+Backend → SQS: { operationId, type: LOCKER_OPEN | LOCKER_CLOSE, payload: { userId, bookingId, lockerBoxId, ... } }
+
+CommandHandler → lockerCommandService
+  ├── simulateDeviceCommand() — IoT gateway stub (replace with real HTTP call for production)
+  ├── SUCCESS → OperationsTable: { status: SUCCESS, result: { lockStatus, doorStatus } }
+  └── FAILED  → OperationsTable: { status: FAILED, errorCode, result: { lockStatus, doorStatus, nextAction } }
+
+Backend (after polling SUCCESS/FAILED):
+  ├── Update LockerCacheTable status
+  └── Update BookingTable status
+```
+
+### Booking TTL cleanup (DynamoDB Streams)
+
+```
+BookingTable TTL expires → DynamoDB Stream (REMOVE event) → BookingTtlCleanupFunction
+  ├── PENDING booking → release locker (AVAILABLE)
+  └── ACTIVE booking  → mark locker EXPIRED, re-insert booking with EXPIRED status
+```
+
+### Cache projection (SQS → DynamoDB)
+
+```
+Backend → SQS CacheProjectionQueue → CacheProjectionHandlerFunction
+  ├── UPSERT (with version check) → LockerCacheTable
+  └── DELETE → LockerCacheTable
 ```
 
 ## Tech Stack
 
 - **Runtime:** Node.js 20.x
-- **Language:** TypeScript
-- **ORM:** Prisma 5.22.0 (shared schema with backend)
+- **Language:** TypeScript (strict mode, CommonJS)
 - **IaC:** AWS SAM (`template.yaml`)
-- **Infrastructure:** AWS Lambda, API Gateway, SQS, DynamoDB, CloudWatch
-- **Database:** PostgreSQL (Amazon RDS) for bookings, DynamoDB for operations
+- **AWS Services:** Lambda, API Gateway, SQS, DynamoDB, CloudWatch
+- **Payment:** Stripe (booking init creates Checkout session)
 
 ## Project Structure
 
@@ -43,35 +71,66 @@ FE polls GET /operations/:id → reads status from DynamoDB
 lambda/
 ├── src/
 │   ├── functions/
-│   │   ├── healthCheck.ts                # Sync health check
+│   │   ├── healthCheck.ts                   # Sync health check (API Gateway)
 │   │   ├── booking/
-│   │   │   └── createBooking.ts          # Create booking
+│   │   │   ├── bookingInitService.ts         # Create booking + Stripe Checkout session
+│   │   │   ├── bookingExtendService.ts       # Extend booking end time
+│   │   │   ├── paymentConfirmService.ts      # Confirm Stripe payment, activate booking
+│   │   │   └── bookingTtlCleanup.ts          # DynamoDB Streams: handle expired bookings
+│   │   ├── cache/
+│   │   │   └── cacheProjectionHandler.ts     # Sync locker availability cache from backend
 │   │   └── operations/
-│   │       ├── commandHandler.ts         # SQS consumer, routes by type
-│   │       └── lambdaHealthService.ts    # Async health check service
+│   │       ├── commandHandler.ts             # SQS consumer — routes by OperationType
+│   │       ├── lambdaHealthService.ts        # HEALTH_CHECK command handler
+│   │       ├── securityEventService.ts       # SECURITY_EVENT command handler
+│   │       ├── lockerCommandService.ts       # LOCKER_OPEN / LOCKER_CLOSE handlers
+│   │       └── lockerDeviceSimulator.ts      # IoT device stub (swap for real HTTP in prod)
 │   ├── db/
-│   │   ├── client.ts                     # Prisma singleton
-│   │   ├── dynamodb.ts                   # DynamoDB operations client
-│   │   ├── prisma/
-│   │   │   └── schema.prisma             # Shared schema (from backend)
-│   │   └── repositories/
-│   │       ├── booking.repository.ts
-│   │       ├── lockerBox.repository.ts
-│   │       └── auditLog.repository.ts
+│   │   └── dynamodb.ts                       # DynamoDB client + all table operations
 │   ├── types/
 │   │   └── contracts/
+│   │       ├── BookingContracts.ts
+│   │       ├── CacheProjectionContracts.ts
 │   │       ├── HealthCheckContracts.ts
-│   │       ├── CreateBookingContracts.ts
-│   │       └── OperationContracts.ts
+│   │       ├── LockerContracts.ts            # LockerErrorCode enum, LockStatus, DoorStatus
+│   │       ├── OperationContracts.ts         # OperationType, OperationStatus, SQSCommand
+│   │       └── SecurityEventContracts.ts
 │   └── utils/
-│       └── response.ts                  # Lambda response helpers
-├── dist/                                 # Compiled JS (generated by tsc)
-├── .aws-sam/                             # SAM build artifacts
-├── template.yaml                         # SAM configuration
-├── samconfig.toml                        # SAM deploy settings
+│       └── response.ts                       # HTTP response helpers
+├── template.yaml                             # SAM infrastructure definition
+├── samconfig.toml                            # SAM deploy settings
 ├── tsconfig.json
 └── package.json
 ```
+
+## Lambda Functions
+
+| Function | Trigger | Description |
+|---|---|---|
+| `HealthCheckFunction` | `GET /health` | Sync status endpoint |
+| `CommandHandlerFunction` | SQS `OperationsQueue` | Routes all async commands by type |
+| `CacheProjectionHandlerFunction` | SQS `CacheProjectionQueue` | Upserts/deletes locker cache entries |
+| `BookingTtlCleanupFunction` | DynamoDB Streams `BookingTable` | Releases or expires lockers on TTL |
+
+## Command Types (OperationsQueue)
+
+| Type | Handler | Description |
+|---|---|---|
+| `HEALTH_CHECK` | `lambdaHealthService` | Lambda liveness check |
+| `SECURITY_EVENT` | `securityEventService` | Log security events |
+| `BOOKING_INIT` | `bookingInitService` | Create booking + Stripe Checkout |
+| `PAYMENT_CONFIRM` | `paymentConfirmService` | Confirm payment, activate booking |
+| `BOOKING_EXTEND` | `bookingExtendService` | Extend booking end time |
+| `LOCKER_OPEN` | `lockerCommandService` | Open locker door via device |
+| `LOCKER_CLOSE` | `lockerCommandService` | Close and lock locker via device |
+
+## DynamoDB Tables
+
+| Table | Key | Purpose |
+|---|---|---|
+| `locker-{env}-operations-dynamodb` | `operationId` | Async operation state (PENDING → SUCCESS/FAILED) |
+| `locker-{env}-booking` | `bookingId` | Bookings with TTL + DynamoDB Streams |
+| `locker-{env}-locker-cache` | `lockerBoxId` | Real-time locker availability (GSI: `stationId-index`) |
 
 ## Prerequisites
 
@@ -80,13 +139,11 @@ lambda/
 - [AWS CLI](https://aws.amazon.com/cli/)
 - [AWS SAM CLI](https://github.com/aws/aws-sam-cli/releases/latest/download/AWS_SAM_CLI_64_PY3.msi)
 
-Verify installation:
-
 ```bash
-node --version     # v20+
-docker --version   # Docker Desktop running
-aws --version      # AWS CLI installed
-sam --version      # SAM CLI installed
+node --version   # v20+
+docker --version # Docker Desktop running
+aws --version
+sam --version
 ```
 
 ## Installation
@@ -94,89 +151,133 @@ sam --version      # SAM CLI installed
 ```bash
 cd lambda
 npm install
-npx prisma generate
 npm run build
 ```
 
 ## Local Development
 
-### Start the local API Gateway
-
 ```bash
-npm run build                  # compile TypeScript → dist/
-sam build                      # build SAM package
-sam local start-api            # starts API Gateway on port 3000
+npm run build          # compile TypeScript → dist/
+sam build              # build SAM package
+sam local start-api    # API Gateway on port 3000
 ```
 
-### Test health check
-
 ```bash
+# Test health check
 curl.exe http://localhost:3000/health
 ```
 
-### Running alongside Express backend
-
-```bash
-sam local start-api --port 3001
-```
-
-Backend `.env`:
-
-```
-USE_LAMBDA_HEALTH=true
-LAMBDA_HEALTH_URL=http://localhost:3001/health
-```
-
-### Notes
-
-- After editing `.ts` files, re-run `npm run build` before testing
-- On Windows PowerShell, use `curl.exe` (not `curl`)
-- SAM creates Docker containers on-demand per request
+> After editing `.ts` files, re-run `npm run build` before testing.  
+> On Windows PowerShell, use `curl.exe` (not `curl`).
 
 ## Deployment
 
-### First time
-
 ```bash
-npm run build
-sam build
-sam deploy --guided
+# First time
+npm run build && sam build && sam deploy --guided
+
+# Subsequent deploys
+npm run build && sam build && sam deploy
 ```
 
-### Subsequent deploys
+## Testing SQS Commands
+
+Create `message.json` and send via AWS CLI:
 
 ```bash
-npm run build
-sam build
-sam deploy
-```
-
-### Testing SQS → CommandHandler flow
-
-Send a test message (use a file to avoid PowerShell quote issues):
-
-```bash
-# Create message.json:
-# {"operationId":"test-001","type":"HEALTH_CHECK"}
-
+# LOCKER_OPEN example
 aws sqs send-message \
   --queue-url "QUEUE_URL_FROM_OUTPUTS" \
   --message-body file://message.json \
   --region eu-west-1
 ```
 
-Check result in DynamoDB via AWS Console or CLI.
+```json
+{
+  "operationId": "op_open_001",
+  "type": "LOCKER_OPEN",
+  "payload": {
+    "userId": "user_123",
+    "bookingId": "bk_001",
+    "lockerBoxId": "locker_55",
+    "stationId": "station_123",
+    "clientRequestId": "req_001",
+    "requestedAt": "2026-04-25T10:00:00.000Z"
+  }
+}
+```
 
-### CloudWatch Logs
+## Contracts
 
-Logs are created automatically for each Lambda. View in AWS Console:
+### Operation lifecycle
 
 ```
-CloudWatch → Log groups → /aws/lambda/locker-dev-health-check
+PENDING → PROCESSING → SUCCESS | FAILED
+```
+
+### LOCKER_OPEN / LOCKER_CLOSE — SUCCESS result
+
+```json
+{
+  "operationId": "op_open_001",
+  "type": "LOCKER_OPEN",
+  "status": "SUCCESS",
+  "bookingId": "bk_001",
+  "lockerBoxId": "locker_55",
+  "result": {
+    "lockStatus": "UNLOCKED",
+    "doorStatus": "OPEN",
+    "message": "Locker opened"
+  },
+  "timestamp": "2026-04-25T10:00:01.000Z"
+}
+```
+
+### LOCKER_OPEN / LOCKER_CLOSE — FAILED result
+
+```json
+{
+  "operationId": "op_open_001",
+  "type": "LOCKER_OPEN",
+  "status": "FAILED",
+  "bookingId": "bk_001",
+  "lockerBoxId": "locker_55",
+  "result": {
+    "lockStatus": "LOCKED",
+    "doorStatus": "CLOSED",
+    "nextAction": "CHANGE_LOCKER"
+  },
+  "errorCode": "LOCK_OPEN_FAILED",
+  "errorMessage": "Locker lock failed to unlock",
+  "timestamp": "2026-04-25T10:00:02.000Z"
+}
+```
+
+### Error codes (`LockerErrorCode`)
+
+| Code | Category | Description |
+|---|---|---|
+| `BOOKING_NOT_FOUND` | Validation | Booking does not exist |
+| `ACCESS_DENIED` | Validation | User does not own this booking |
+| `BOOKING_NOT_ACTIVE` | Validation | Booking is not in ACTIVE status |
+| `BOOKING_EXPIRED` | Validation | Booking TTL has passed |
+| `LOCKER_BOOKING_MISMATCH` | Validation | lockerBoxId does not match booking |
+| `LOCK_OPEN_FAILED` | Device | Lock mechanism failed to disengage |
+| `DOOR_OPEN_FAILED` | Device | Lock disengaged but door did not open |
+| `LOCK_CLOSE_FAILED` | Device | Lock failed to engage after close |
+| `DOOR_CLOSE_FAILED` | Device | Door failed to close |
+| `LOCKER_STATE_INVALID` | System | Unexpected device state |
+| `DEVICE_SIMULATION_FAILED` | System | Unhandled exception in device layer |
+| `OPEN_ATTEMPTS_EXHAUSTED` | System | All retry attempts to open failed |
+| `CLOSE_ATTEMPTS_EXHAUSTED` | System | All retry attempts to close failed |
+| `BATCH_OPEN_FAILED` | System | Batch open operation failed |
+
+## CloudWatch Logs
+
+```
 CloudWatch → Log groups → /aws/lambda/locker-dev-command-handler
+CloudWatch → Log groups → /aws/lambda/locker-dev-health-check
 ```
-
-Or via CLI:
 
 ```bash
 sam logs --name CommandHandlerFunction --stack-name locker-lambda-dev --region eu-west-1
@@ -185,101 +286,23 @@ sam logs --name CommandHandlerFunction --stack-name locker-lambda-dev --region e
 ## Deployed Resources
 
 | Resource | Type | Value |
-|----------|------|-------|
+|---|---|---|
 | Health Check | API Gateway | `https://0kvn3au8e9.execute-api.eu-west-1.amazonaws.com/Prod/health` |
 | Operations Queue | SQS | `https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue` |
 | Operations Queue ARN | SQS | `arn:aws:sqs:eu-west-1:131904957044:locker-dev-operations-queue` |
 | Operations Table | DynamoDB | `locker-dev-operations-dynamodb` |
 | Region | — | `eu-west-1` |
 
-## Contracts
-
-### Health Check (sync)
-
-**Request:** `GET /health`
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "uptime": 0,
-  "services": { "lambda": { "status": "ok" } }
-}
-```
-
-### SQS Command (async)
-
-**Message body:**
-```json
-{
-  "operationId": "uuid",
-  "type": "HEALTH_CHECK",
-  "payload": {}
-}
-```
-
-**Operation statuses:** `PENDING → PROCESSING → SUCCESS | FAILED`
-
-### Create Booking (planned)
-
-**Request:**
-```json
-{
-  "userId": "uuid",
-  "lockerBoxId": "uuid",
-  "expectedEndTime": "2026-03-24T18:00:00.000Z",
-  "correlationId": "uuid"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "booking": {
-    "bookingId": "uuid",
-    "status": "PENDING",
-    "startTime": "...",
-    "expectedEndTime": "...",
-    "totalPrice": "15.00"
-  }
-}
-```
-
-## Lambda Functions
-
-| Function | Trigger | Status | Description |
-|----------|---------|:---:|-------------|
-| `healthCheck` | API Gateway | ✅ | Sync health check |
-| `commandHandler` | SQS | ✅ | Routes commands by type |
-| `lambdaHealthService` | CommandHandler | ✅ | Async health check, updates DynamoDB |
-| `createBooking` | API Gateway | 🔜 | Create booking, reserve locker |
-| `cancelBooking` | API Gateway | 🔜 | Cancel booking, release locker |
-| `extendBooking` | API Gateway | 🔜 | Extend booking end time |
-| `updateBookingStatus` | API Gateway | 🔜 | Change status (admin/operator) |
-| `expireBookings` | cron (5 min) | 🔜 | Expire overdue bookings |
-| `sendNotification` | SQS | 🔜 | Send email/SMS |
-
-## Backend Integration
-
-For the backend to use SQS and DynamoDB, it needs:
-
-1. **IAM permissions** for `sqs:SendMessage` and `dynamodb:PutItem/GetItem/UpdateItem`
-2. **Environment variables:**
-
-```
-OPERATIONS_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
-OPERATIONS_TABLE=locker-dev-operations-dynamodb
-AWS_REGION=eu-west-1
-```
-
 ## Environment Variables
 
 | Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (RDS) |
-| `NODE_ENV` | Environment (dev / staging / prod) |
-| `OPERATIONS_TABLE` | DynamoDB table name for operations |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NODE_ENV` | `dev` / `staging` / `prod` |
+| `STRIPE_SECRET_KEY` | Stripe API key (booking init) |
+| `OPERATIONS_TABLE` | DynamoDB operations table name |
+| `BOOKING_TABLE` | DynamoDB booking table name |
+| `LOCKER_CACHE_TABLE` | DynamoDB locker cache table name |
 
 ## Team
 

@@ -1,5 +1,5 @@
 import { SQSEvent } from 'aws-lambda';
-import { SQSCommand, OperationType, OperationStatus } from '../../types/contracts/OperationContracts';
+import { SQSCommand, OperationType, OperationStatus, LockerCommand } from '../../types/contracts/OperationContracts';
 import { SecurityEventPayload } from '../../types/contracts/SecurityEventContracts';
 import { updateOperationStatus } from '../../db/dynamodb';
 import { handleHealthCheck } from './lambdaHealthService';
@@ -8,7 +8,8 @@ import { handlePaymentConfirm } from '../booking/paymentConfirmService';
 import { BookingInitCommand, PaymentConfirmCommand, BookingExtendCommand } from '../../types/contracts/BookingContracts';
 import { handleBookingExtend } from '../booking/bookingExtendService';
 import { handleBookingInit } from '../booking/bookingInitService';
- 
+import { handleLockerOpen, handleLockerClose } from './lockerCommandService';
+
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
     const command: SQSCommand = JSON.parse(record.body);
@@ -46,7 +47,15 @@ export const handler = async (event: SQSEvent): Promise<void> => {
         case OperationType.BOOKING_EXTEND:
           await handleBookingExtend(command as unknown as BookingExtendCommand);
           break;
- 
+
+        case OperationType.LOCKER_OPEN:
+          await handleLockerOpen(command as unknown as LockerCommand);
+          break;
+
+        case OperationType.LOCKER_CLOSE:
+          await handleLockerClose(command as unknown as LockerCommand);
+          break;
+
         default:
           throw new Error(`Unknown command type: ${command.type}`);
       }
