@@ -44,7 +44,11 @@ type AuditAction =
     | 'PRICE_CREATE'
     | 'PRICE_CREATE_FAILED'
     | 'PRICE_UPDATE'
-    | 'PRICE_UPDATE_FAILED';
+    | 'PRICE_UPDATE_FAILED'
+    | 'LOCKER_OPEN_USER'
+    | 'LOCKER_OPEN_USER_FAILED'
+    | 'LOCKER_CLOSE_USER'
+    | 'LOCKER_CLOSE_USER_FAILED';
 
 interface AuditParams {
     req: Request;

@@ -84,6 +84,32 @@ export type BookingExtendConfirmCommand = {
     };
 };
 
+export type OpenLockerUserCommand = {
+    operationId: string;
+    type: OperationType.LOCKER_OPEN;
+    payload: {
+        userId: string;
+        stationId: string;
+        lockerBoxId: string;
+        bookingId: string;
+        clientRequestId: string;
+        requestedAt: string;
+    };
+};
+
+export type CloseLockerUserCommand = {
+    operationId: string;
+    type: OperationType.LOCKER_CLOSE;
+    payload: {
+        userId: string;
+        stationId: string;
+        lockerBoxId: string;
+        bookingId: string;
+        clientRequestId: string;
+        requestedAt: string;
+    };
+};
+
 type LockerCacheProjectionEvent =
     | {
         eventId: string;
@@ -201,6 +227,14 @@ export async function sendBookingInitToQueue(command: BookingInitCommand) {
 }
 
 export async function sendBookingExtendConfirmToQueue(command: BookingExtendConfirmCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendOpenLockerUserCommand(command: OpenLockerUserCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendCloseLockerUserCommand(command: CloseLockerUserCommand) {
     await sendCommandToQueue(command);
 }
 
