@@ -16,8 +16,7 @@ export const citiesRoutes = express.Router();
 
 citiesRoutes.get('/',citiesController.getAllCities);
 citiesRoutes.post('/',auth.protect,authorize(Role.ADMIN),citiesController.createCities)
-
-citiesRoutes.delete('/',auth.protect,authorize(Role.ADMIN),citiesController.deleteCities);
+citiesRoutes.delete('/:id',auth.protect,authorize(Role.ADMIN),citiesController.deleteCities);
 
 //citiesRoutes.patch('/',auth.protect,authorize(Role.ADMIN),citiesController.changeCities);
 
