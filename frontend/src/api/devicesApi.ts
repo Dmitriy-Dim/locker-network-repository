@@ -1,14 +1,11 @@
 import { apiClient } from "./apiClient";
 
-
 export interface DeviceOperationData {
     operationId: string;
-    type: "LOCKER_OPEN" | "LOCKER_CLOSE";
+    type: "LOCKER_OPEN" | "LOCKER_CLOSE" | "BOOKING_CANCEL";
     status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
     bookingId: string;
-    lockerBoxId: string;
-
-
+    lockerBoxId?: string;
     result?: {
         lockStatus: "UNLOCKED" | "LOCKED";
         doorStatus: "OPEN" | "CLOSED";
@@ -37,8 +34,13 @@ export const devicesApi = {
         return data.data;
     },
 
+    cancelBooking: async (bookingId: string): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>(`/bookings/${bookingId}/cancel`);
+        return data.data;
+    },
+
     getOperationStatus: async (operationId: string): Promise<DeviceOperationData> => {
         const { data } = await apiClient.get<DeviceOperationResponse>(`/operations/${operationId}`);
         return data.data;
-    }
+    },
 };

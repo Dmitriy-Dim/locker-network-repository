@@ -15,21 +15,21 @@ export function useLockers() {
         qc.invalidateQueries({ queryKey: ["stations"] });
         qc.invalidateQueries({ queryKey: ["station-details"] });
         qc.invalidateQueries({ queryKey: ["operator-stations"] });
-        qc.invalidateQueries({ queryKey: ["bookings-my"] }); // 👈 важно
+        qc.invalidateQueries({ queryKey: ["bookings-my"] });
+        qc.invalidateQueries({ queryKey: ["my-bookings"] });
     };
 
     // 🔧 tech status
     const changeStatus = useMutation({
         mutationFn: ({ lockerBoxId, techStatus }: ChangeLockerStatusPayload) =>
             lockersApi.updateLockerTechStatusOperator(lockerBoxId, techStatus),
-
         onSuccess: invalidateAll,
         onError: (error) => {
             console.error("Locker status update failed", error);
         }
     });
 
-    // 🔧 booking cancel
+    // 🔧 booking cancel (Твоя логика)
     const cancelBookingMutation = useMutation({
         mutationFn: (bookingId: string) =>
             lockersApi.cancelBooking(bookingId),
@@ -57,13 +57,10 @@ export function useLockers() {
         // locker status
         changeLockerTechStatus: changeStatus.mutateAsync,
         isUpdating: changeStatus.isPending,
-
         activate,
         setMaintenance,
         setFaulty,
         setInactive,
-
-
         cancelBooking: cancelBookingMutation.mutateAsync
     };
 }

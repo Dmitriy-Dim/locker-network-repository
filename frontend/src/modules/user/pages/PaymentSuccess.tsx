@@ -5,6 +5,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { useBooking } from "../../../hooks/useBooking.ts";
 import { Paths } from "../../../config/paths/paths.ts";
+import { useQuery } from "@tanstack/react-query";
+import { lockersApi } from "../../../api/lockersApi.ts";
 
 export function PaymentSuccess() {
     const [searchParams] = useSearchParams();
@@ -21,7 +23,8 @@ export function PaymentSuccess() {
 
     const polled = useRef(false);
 
-       useEffect(() => {
+    // 1. Поллинг для подтверждения оплаты
+    useEffect(() => {
         if (!finalId) return;
         if (polled.current) return;
         polled.current = true;
@@ -29,7 +32,6 @@ export function PaymentSuccess() {
         pollOperation(finalId, 'PAYMENT_CONFIRM')
             .then((op) => {
                 console.log("Оплата подтверждена бэкендом!", op);
-
                 const extractedLockerId = op.result?.lockerBoxId || op.lockerBoxId || op.payload?.lockerBoxId;
                 setLockerId(extractedLockerId);
                 setStatus('success');
@@ -40,8 +42,8 @@ export function PaymentSuccess() {
             });
     }, [finalId, pollOperation]);
 
-
-        useEffect(() => {
+    // 2. Таймер для редиректа (теперь использует navigate, чтобы не выкидывало из системы)
+    useEffect(() => {
         if (status === 'success') {
             const timer = setInterval(() => {
                 setCountdown((prev) => {
@@ -57,9 +59,20 @@ export function PaymentSuccess() {
         }
     }, [status, navigate]);
 
+    // 3. Загрузка реального кода ячейки по ее ID
+    const { data: lockerData } = useQuery({
+        queryKey: ['locker-details', lockerId],
+        queryFn: () => lockersApi.getLockerById(lockerId!),
+        enabled: !!lockerId // Запрашиваем только когда получили ID от поллинга
+    });
+
+    // Формируем красивый номер ячейки для отображения
+    const displayCode = lockerData?.code || (lockerId ? lockerId.slice(-4).toUpperCase() : 'READY');
+
     return (
         <Box sx={{ pt: '100px', display: 'flex', justifyContent: 'center', px: 2 }}>
             <Paper sx={{ p: 6, borderRadius: 4, textAlign: 'center', maxWidth: 500, width: '100%' }}>
+
                 {status === 'loading' && (
                     <Stack alignItems="center" spacing={2}>
                         <CircularProgress size={60} sx={{ color: '#6baf5c' }} />
@@ -77,8 +90,9 @@ export function PaymentSuccess() {
                             <Typography color="text.secondary" fontWeight={600} mb={1}>
                                 Your Locker Number is:
                             </Typography>
+                            {/* Выводим реальный номер ячейки */}
                             <Typography variant="h3" fontWeight={900} color="#166534">
-                                #{lockerId ? lockerId.slice(-4).toUpperCase() : 'READY'}
+                                #{displayCode}
                             </Typography>
                         </Box>
 
