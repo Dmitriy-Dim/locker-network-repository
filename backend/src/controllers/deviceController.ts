@@ -28,22 +28,6 @@ export const openDeviceOper = async (req: Request, res: Response, next: NextFunc
     }
 };
 
-export const openDeviceOperByStatus = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        return await deviceService.openDeviceOperByStatus(req, res);
-    } catch (e) {
-        next(e);
-    }
-};
-
-export const openAllDevicesOper = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        return await deviceService.openAllDevicesOper(req, res);
-    } catch (e) {
-        next(e);
-    }
-};
-
 export const closeDeviceOper = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await deviceService.closeDeviceOper(req, res);
@@ -52,18 +36,3 @@ export const closeDeviceOper = async (req: Request, res: Response, next: NextFun
     }
 };
 
-export const closeDeviceOperByStatus = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        return await deviceService.closeDeviceOperByStatus(req, res);
-    } catch (e) {
-        next(e);
-    }
-};
-
-export const closeAllDevicesOper = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        return await deviceService.closeAllDevicesOper(req, res);
-    } catch (e) {
-        next(e);
-    }
-};

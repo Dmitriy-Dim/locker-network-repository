@@ -1,5 +1,6 @@
 import {Request, Response} from "express";
 import {v4 as uuidv4} from "uuid";
+import {Role} from "@prisma/client";
 
 import {logAudit} from "../utils/audit";
 import {operationRepository} from "../repositories/operation/OperationRepository";
@@ -10,6 +11,7 @@ import {idempotencyService} from "./IdempotencyService";
 import {ActionType, OperationStatus, OperationType} from "./dto/operationDto";
 import {sendCloseLockerUserCommand, sendOpenLockerUserCommand} from "./sqsService";
 import {getBooking} from "./dynamoService";
+import {prismaService} from "./prismaService";
 
 
 function toQueuedDeviceOperationResponse<T extends Record<string, unknown>>(
@@ -25,6 +27,44 @@ function toQueuedDeviceOperationResponse<T extends Record<string, unknown>>(
         ...(payload ?? {}),
         ...(message ? { message } : {}),
     };
+}
+
+async function checkDataUserRequest(req: Request, userId: string){
+    const {stationId, lockerBoxId, bookingId} = req.body as {stationId: string, lockerBoxId: string, bookingId: string};
+    const role = req.user?.role;
+
+    const locker = await prismaService.lockerBox.findUnique({
+        where: {lockerBoxId}
+    })
+    if (!locker) {
+        throw new HttpError(404, "locker not found");
+    }
+    if (locker.techStatus !== 'ACTIVE'){
+        throw new HttpError(409, "locker not ACTIVE");
+    }
+
+    const booking = await getBooking(bookingId) as BookingRecordDto | undefined;
+    if (!booking) {
+        throw new HttpError(404, "Booking not found");
+    }
+    if (role === Role.USER && booking.userId !== userId){
+        throw new HttpError(403, "Access denied");
+    }
+    if (booking.status !== "ACTIVE") {
+        throw new HttpError(409, "Booking is not active");
+    }
+    if (new Date(booking.expectedEndTime) < new Date()){
+        throw new HttpError(409, "Booking has expired");
+    }
+    if(booking.lockerBoxId !== lockerBoxId){
+        throw new HttpError(409, "Locker does not match booking");
+    }
+    if (booking.stationId !== stationId) {
+        throw new HttpError(409, "Station does not match booking");
+    }
+
+    //ToDo check active operations with this data
+
 }
 
 
@@ -43,16 +83,10 @@ export class DeviceService {
                     throw new HttpError(401, "Unauthorized");
                 }
 
+                await checkDataUserRequest(req, userId);
+
                 const operationId = uuidv4();
                 const {stationId, lockerBoxId, bookingId, clientRequestId} = req.body as {stationId: string, lockerBoxId: string, bookingId: string, clientRequestId: string};
-
-                const booking = await getBooking(bookingId) as BookingRecordDto | undefined;
-                if (!booking) {
-                    throw new HttpError(404, "Booking not found");
-                }
-                if (booking.userId !== userId){
-                    throw new HttpError(403, "Access denied");
-                }
 
                 try {
                     await operationRepository.create({
@@ -133,16 +167,10 @@ export class DeviceService {
                     throw new HttpError(401, "Unauthorized");
                 }
 
+                await checkDataUserRequest(req, userId);
+
                 const operationId = uuidv4();
                 const {stationId, lockerBoxId, bookingId, clientRequestId} = req.body as {stationId: string, lockerBoxId: string, bookingId: string, clientRequestId:string};
-
-                const booking = await getBooking(bookingId) as BookingRecordDto | undefined;
-                if (!booking) {
-                    throw new HttpError(404, "Booking not found");
-                }
-                if (booking.userId !== userId){
-                    throw new HttpError(403, "Access denied");
-                }
 
                 try {
                     await operationRepository.create({
@@ -216,17 +244,6 @@ export class DeviceService {
         return res.status(200).send({message: "Not implemented yet"});
     }
 
-    async openDeviceOperByStatus(req: Request, res: Response) {
-
-
-        return res.status(200).send({message: "Not implemented yet"});
-    }
-
-    async openAllDevicesOper(req: Request, res: Response) {
-
-
-        return res.status(200).send({message: "Not implemented yet"});
-    }
 
     async closeDeviceOper(req: Request, res: Response) {
 
@@ -234,17 +251,6 @@ export class DeviceService {
         return res.status(200).send({message: "Not implemented yet"});
     }
 
-    async closeDeviceOperByStatus(req: Request, res: Response) {
-
-
-        return res.status(200).send({message: "Not implemented yet"});
-    }
-
-    async closeAllDevicesOper(req: Request, res: Response) {
-
-
-        return res.status(200).send({message: "Not implemented yet"});
-    }
 
 }
 
