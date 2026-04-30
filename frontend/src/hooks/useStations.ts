@@ -46,9 +46,9 @@ export function useStations(options?: { publicOnly?: boolean }) {
 
     const changeStatus = useMutation({
         mutationFn: ({ id, status }: ChangeStationStatusPayload) => {
-            if (status === "READY") {
-                return stationsApi.updateStationStatusOperator(id, status);
-            }
+            // if (status === "READY") {
+            //     return stationsApi.updateStationStatusOperator(id, status);
+            // }
 
             if (status === "ACTIVE" || status === "MAINTENANCE") {
                 return stationsApi.updateStationStatusAdmin(id, status);

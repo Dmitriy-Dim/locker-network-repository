@@ -32,7 +32,7 @@ export default function StationDetailsPage() {
     const { stationId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { changeLockertechStatus } = useLockers();
+    const { changeLockerTechStatus } = useLockers();
     const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
@@ -102,13 +102,13 @@ export default function StationDetailsPage() {
                             {user?.role === ROLES.ADMIN && (
                                 <Box mt={2} display="flex" flexDirection="column" gap={1}>
 
-                                    {locker.techStatus === "READY" && (
+                                    {locker.techStatus === "ACTIVE" && (
                                         <Button
                                             variant="contained"
                                             size="small"
                                             onClick={async () => {
                                                 try {
-                                                    await changeLockertechStatus({
+                                                    await changeLockerTechStatus({
                                                         lockerBoxId: locker.lockerBoxId,
                                                         techStatus: "ACTIVE"
                                                     });
@@ -128,7 +128,7 @@ export default function StationDetailsPage() {
                                             color="error"
                                             onClick={async () => {
                                                 try {
-                                                    await changeLockertechStatus({
+                                                    await changeLockerTechStatus({
                                                         lockerBoxId: locker.lockerBoxId,
                                                         techStatus: "MAINTENANCE"
                                                     });

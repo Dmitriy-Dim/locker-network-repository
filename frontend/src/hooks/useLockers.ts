@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { lockersApi } from "../api/lockersApi";
-import type { LockertechStatus } from "../types/index";
+import type { LockerTechStatus } from "../types/index";
 
 interface ChangeLockerStatusPayload {
     lockerBoxId: string;
-    techStatus: LockertechStatus;
+    techStatus: LockerTechStatus;
 }
 
 export function useLockers() {
@@ -14,22 +14,33 @@ export function useLockers() {
         qc.invalidateQueries({ queryKey: ["lockers"] });
         qc.invalidateQueries({ queryKey: ["stations"] });
         qc.invalidateQueries({ queryKey: ["station-details"] });
+        qc.invalidateQueries({ queryKey: ["operator-stations"] });
+        qc.invalidateQueries({ queryKey: ["bookings-my"] }); // 👈 важно
     };
 
+    // 🔧 tech status
     const changeStatus = useMutation({
         mutationFn: ({ lockerBoxId, techStatus }: ChangeLockerStatusPayload) =>
-            lockersApi.updateLockertechStatus(lockerBoxId, techStatus),
+            lockersApi.updateLockerTechStatusOperator(lockerBoxId, techStatus),
 
         onSuccess: invalidateAll,
-
         onError: (error) => {
             console.error("Locker status update failed", error);
         }
     });
 
-    const setReady = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "READY" });
+    // 🔧 booking cancel
+    const cancelBookingMutation = useMutation({
+        mutationFn: (bookingId: string) =>
+            lockersApi.cancelBooking(bookingId),
 
+        onSuccess: invalidateAll,
+        onError: (e) => {
+            console.error("Cancel booking failed", e);
+        }
+    });
+
+    // helpers
     const activate = (id: string) =>
         changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "ACTIVE" });
 
@@ -39,20 +50,20 @@ export function useLockers() {
     const setFaulty = (id: string) =>
         changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "FAULTY" });
 
-    const cancelBookingMutation = useMutation({
-        mutationFn: (id: string) => lockersApi.cancelBooking(id),
-        onSuccess: invalidateAll,
-        onError: (e) => console.error("Cancel booking failed", e)
-    });
+    const setInactive = (id: string) =>
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "INACTIVE" });
 
     return {
-        changeLockertechStatus: changeStatus.mutateAsync,
+        // locker status
+        changeLockerTechStatus: changeStatus.mutateAsync,
         isUpdating: changeStatus.isPending,
 
-        setReady,
         activate,
         setMaintenance,
         setFaulty,
+        setInactive,
+
+
         cancelBooking: cancelBookingMutation.mutateAsync
     };
 }

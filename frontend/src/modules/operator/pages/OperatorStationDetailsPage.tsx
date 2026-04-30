@@ -7,26 +7,23 @@ import type { LockerStation } from "../../../types/index";
 import { Box, Typography, Paper, Chip, Button } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
-const getChipColor = (
-    status: string
-): "success" | "warning" | "default" | "error" => {
+const getChipColor = (status: string) => {
     switch (status) {
         case "ACTIVE": return "success";
-        case "READY": return "warning";
-        case "INACTIVE": return "default";
         case "MAINTENANCE":
         case "FAULTY": return "error";
+        case "INACTIVE": return "default";
         default: return "default";
     }
 };
 
 export default function OperatorStationDetailsPage() {
     const { stationId } = useParams();
-    const { setReady } = useLockers();
+    const { activate } = useLockers();
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["operator-station", stationId],
-        queryFn: () => stationsApi.getStationById(stationId!),
+        queryFn: () => stationsApi.getOperatorStationById(stationId!),
         enabled: !!stationId
     });
 
@@ -35,7 +32,6 @@ export default function OperatorStationDetailsPage() {
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h4">Station Details</Typography>
-            <Typography sx={{ mb: 3 }}>{station?.address}</Typography>
 
             <Grid container spacing={2}>
                 {lockers.map((locker) => (
@@ -47,31 +43,13 @@ export default function OperatorStationDetailsPage() {
                                 label={locker.techStatus}
                                 color={getChipColor(locker.techStatus)}
                                 size="small"
-                                sx={{ mt: 1 }}
                             />
 
-                            <Box mt={2}>
-                                {locker.techStatus === "INACTIVE" && (
-                                    <Button
-                                        variant="contained"
-                                        size="small"
-                                        onClick={() => setReady(locker.lockerBoxId)}
-                                    >
-                                        Prepare
-                                    </Button>
-                                )}
-
-                                {locker.techStatus === "MAINTENANCE" && (
-                                    <Button
-                                        variant="contained"
-                                        size="small"
-                                        color="success"
-                                        onClick={() => setReady(locker.lockerBoxId)}
-                                    >
-                                        Fix & Ready
-                                    </Button>
-                                )}
-                            </Box>
+                            {locker.techStatus !== "ACTIVE" && (
+                                <Button onClick={() => activate(locker.lockerBoxId)}>
+                                    Activate
+                                </Button>
+                            )}
                         </Paper>
                     </Grid>
                 ))}

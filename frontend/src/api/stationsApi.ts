@@ -41,7 +41,6 @@ export const stationsApi = {
         return data.data;
     },
 
-    // ✅ Админ управляет ТОЛЬКО статусом станции (не locker)
     updateStationStatusAdmin: async (
         id: string,
         status: Extract<StationStatus, "ACTIVE" | "MAINTENANCE">
@@ -57,15 +56,16 @@ export const stationsApi = {
     // OPERATOR
     // ===============================
 
-    // ❗ ВАЖНО: ЭТОГО эндпоинта НЕТ в твоем Postman
-    // Если бэк не добавит — будет 404
-    updateStationStatusOperator: async (
-        id: string,
-        status: Extract<StationStatus, "READY">
-    ): Promise<LockerStation> => {
-        const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
-            `/lockers/oper/stations/${id}/status`,
-            { status }
+    getOperatorStations: async (): Promise<LockerStation[]> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
+            "/lockers/oper/stations"
+        );
+        return data.data;
+    },
+
+    getOperatorStationById: async (id: string): Promise<LockerStation> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(
+            `/lockers/oper/stations/${id}`
         );
         return data.data;
     },
@@ -96,10 +96,9 @@ export const stationsApi = {
     },
 
     // ===============================
-    // LOCKERS (через station)
+    // LOCKERS
     // ===============================
 
-    // ✅ ВСЕ новые боксы = INACTIVE (логика на backend)
     addLocker: async (payload: {
         stationId: string;
         code: string;
