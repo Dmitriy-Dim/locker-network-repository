@@ -411,7 +411,6 @@
       "TechnicalStatus": {
         "type": "string",
         "enum": [
-          "READY",
           "ACTIVE",
           "INACTIVE",
           "MAINTENANCE",
@@ -1511,11 +1510,11 @@
         }
       }
     },
-    "/api/v1/lockers/admin/boxes/{id}/tech-status": {
+    "/api/v1/lockers/oper/boxes/{id}/tech-status": {
       "patch": {
         "tags": [
           "Lockers",
-          "Admin"
+          "Operator"
         ],
         "summary": "Change locker technical status",
         "security": [
@@ -1539,7 +1538,7 @@
                 "$ref": "#/components/schemas/ChangeLockerTechStatusRequest"
               },
               "example": {
-                "techStatus": "READY"
+                "techStatus": "ACTIVE"
               }
             }
           }

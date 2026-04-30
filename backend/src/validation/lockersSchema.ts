@@ -8,7 +8,6 @@ export const LockerStatusEnum = z.enum([
 ]);
 
 export const TechnicalStatusEnum = z.enum([
-    "READY",
     "ACTIVE",
     "INACTIVE",
     "MAINTENANCE",
@@ -38,15 +37,6 @@ export const getLockersWithParamsSchema = z.object({
 });
 
 export const oneLockerSchema = z.object({
-    params: z.object({
-        id: z.string().uuid(),
-    })
-});
-
-export const changeStatusLockerSchema = z.object({
-    body: z.object({
-        status: LockerStatusEnum,
-    }),
     params: z.object({
         id: z.string().uuid(),
     })

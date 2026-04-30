@@ -94,6 +94,107 @@ export class CitiesServiceImplPostgres {
         )
 
     }
+
+
+    async deleteCities(req: Request, res: Response) {
+        return idempotencyService.execute(
+            req,
+            res,
+            "city:delete",
+            { cityId: req.params.id },
+            async () => {
+                const rawCityId = req.params.id;
+                const cityId = Array.isArray(rawCityId)
+                    ? rawCityId[0]
+                    : rawCityId;
+
+                if (!cityId) {
+                    throw new HttpError(400, "City id is required");
+                }
+
+                try {
+                    const result = await prismaService.$transaction(async (tx) => {
+                        const cityExist = await tx.city.findUnique({
+                            where: { cityId },
+                            select: {
+                                cityId: true,
+                                code: true,
+                                name: true,
+                                isActive: true,
+                            },
+                        });
+
+                        if (!cityExist) {
+                            throw new HttpError(404, "City not found");
+                        }
+
+                        if (cityExist.isActive === false) {
+                            return { city: cityExist };
+                        }
+
+                        const city = await tx.city.update({
+                            where: { cityId },
+                            data: {
+                                isActive: false,
+                            },
+                            select: {
+                                cityId: true,
+                                code: true,
+                                name: true,
+                                isActive: true,
+                            },
+                        });
+
+                        return { city };
+                    });
+
+                    const cityProjection = await lockerCatalogProjectionService.getCityCacheProjection(result.city.cityId);
+                    const cityCacheStatus = cityProjection
+                        ? await syncCityProjection(cityProjection)
+                        : "SYNCED";
+
+                    await logAudit({
+                        req,
+                        action: ActionType.CITY_DELETE,
+                        actorId: req.user?.userId,
+                        entityId: result.city.cityId,
+                        entityType: "City",
+                    });
+
+                    return {
+                        statusCode: 200,
+                        body: {
+                            id: result.city.cityId,
+                            isActive: result.city.isActive,
+                        },
+                        meta: {
+                            cityCacheStatus,
+                        },
+                    };
+                } catch (e) {
+                    await logAudit({
+                        req,
+                        action: ActionType.CITY_DELETE_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: cityId,
+                        entityType: "City",
+                        details: {
+                            reason: e instanceof Error ? e.message : "Unknown error",
+                        },
+                    });
+
+                    if (e instanceof HttpError) {
+                        throw e;
+                    }
+
+                    throw new HttpError(500, "Failed to delete city");
+                }
+            }
+        );
+    }
+
+
+
 }
 
 export const citiesService = new CitiesServiceImplPostgres();

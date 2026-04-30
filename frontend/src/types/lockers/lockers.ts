@@ -2,7 +2,6 @@
 
 export type LockertechStatus =
     | 'INACTIVE'
-    | 'READY'
     | 'ACTIVE'
     | 'MAINTENANCE'
     | 'FAULTY';
@@ -20,7 +19,7 @@ export type LockerStatus =
 
 // --- OTHER TYPES ---
 
-export type StationStatus = 'ACTIVE' | 'INACTIVE' | 'READY' | 'MAINTENANCE';
+export type StationStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
 export type LockerSize = 'S' | 'M' | 'L';
 
 export interface City {

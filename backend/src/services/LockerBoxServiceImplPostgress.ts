@@ -1,27 +1,30 @@
-import { Request, Response } from "express";
-import { LockerStatus, TechnicalStatus } from "@prisma/client";
+import {Request, Response} from "express";
+import {LockerStatus, TechnicalStatus} from "@prisma/client";
 
-import { HttpError } from "../errorHandler/HttpError";
-import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
-import { logAudit } from "../utils/audit";
-import { sendSuccess } from "../utils/response";
+import {HttpError} from "../errorHandler/HttpError";
+import {
+    lockerCatalogProjectionService
+} from "../repositories/prisma/LockerCatalogProjectionService";
+import {logAudit} from "../utils/audit";
+import {sendSuccess} from "../utils/response";
 
-import { ActionType } from "./dto/operationDto";
-import { idempotencyService } from "./IdempotencyService";
+import {ActionType} from "./dto/operationDto";
+import {idempotencyService} from "./IdempotencyService";
 import {
     assertValidLockerStatusTransition,
-    assertValidLockerTechStatusTransition,
     deleteLockerProjection,
     loadLockers,
     loadOneLocker,
-    LockerQuery,
     lockerMeta,
+    LockerQuery,
     resolveLockerStateForTechStatus,
     syncLockerProjection,
     toLockerResponse,
 } from "./lockerBox/lockerBoxService.helpers";
-import { syncStationProjection } from "./lockerStation/lockerStationService.helpers";
-import { prismaService } from "./prismaService";
+import {
+    syncStationProjection
+} from "./lockerStation/lockerStationService.helpers";
+import {prismaService} from "./prismaService";
 
 export class LockerBoxServiceImplPostgres {
     async getAllBoxes(_req: Request, res: Response) {
@@ -273,12 +276,6 @@ export class LockerBoxServiceImplPostgres {
                                 "INVALID_STATUS_TRANSITION"
                             );
                         }
-
-                        assertValidLockerTechStatusTransition({
-                            currentTechStatus: locker.techStatus,
-                            nextTechStatus: techStatus,
-                            role: req.user?.role,
-                        });
 
                         const runtimeState = resolveLockerStateForTechStatus({
                             currentStatus: locker.status,

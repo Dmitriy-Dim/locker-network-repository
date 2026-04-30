@@ -13,12 +13,11 @@ interface LockersGridProps {
 
 const getChipColor = (status: string): "success" | "warning" | "default" | "error" => {
     switch (status) {
-        case "ACTIVE":      return "success";
-        case "READY":       return "warning";
-        case "MAINTENANCE": return "error";
-        case "FAULTY":      return "error";
-        case "INACTIVE":    return "default";
-        default:            return "default";
+        case "ACTIVE": return "success";
+        case "MAINTENANCE":
+        case "FAULTY": return "error";
+        case "INACTIVE": return "default";
+        default: return "default";
     }
 };
 
@@ -32,85 +31,56 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
     });
 
     const { user } = useAuth();
-    const { setReady, activate, setMaintenance } = useLockers();
+    const { activate, setMaintenance, setFaulty } = useLockers();
 
     return (
         <Grid container spacing={2}>
             {lockers.map((locker) => (
                 <Grid item xs={6} sm={4} md={3} key={locker.lockerBoxId}>
-                    <Paper sx={{ p: 2, borderRadius: 2 }}>
-                        <Typography variant="h6">
-                            Box #{locker.code}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Size: {locker.size}
-                        </Typography>
+                    <Paper sx={{ p: 2 }}>
+                        <Typography>Box #{locker.code}</Typography>
 
                         <Chip
-                            label={locker.status}
-                            color={getChipColor(locker.status)}
+                            label={locker.techStatus}
+                            color={getChipColor(locker.techStatus)}
                             size="small"
                             sx={{ mt: 1 }}
                         />
 
                         <Box mt={2} display="flex" flexDirection="column" gap={1}>
-                            {/* OPERATOR: INACTIVE → READY */}
-                            {user?.role === "OPERATOR" && locker.techStatus === "INACTIVE" && (
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    onClick={() => setReady(locker.lockerBoxId)}
-                                >
-                                    Set READY
-                                </Button>
+
+                            {/* OPERATOR */}
+                            {user?.role === "OPERATOR" && (
+                                <>
+                                    {locker.techStatus === "INACTIVE" && (
+                                        <Button onClick={() => activate(locker.lockerBoxId)}>
+                                            Activate
+                                        </Button>
+                                    )}
+
+                                    {locker.techStatus === "ACTIVE" && (
+                                        <>
+                                            <Button onClick={() => setMaintenance(locker.lockerBoxId)}>
+                                                Maintenance
+                                            </Button>
+                                            <Button onClick={() => setFaulty(locker.lockerBoxId)}>
+                                                Faulty
+                                            </Button>
+                                        </>
+                                    )}
+
+                                    {(locker.techStatus === "MAINTENANCE" || locker.techStatus === "FAULTY") && (
+                                        <Button onClick={() => activate(locker.lockerBoxId)}>
+                                            Restore → Active
+                                        </Button>
+                                    )}
+                                </>
                             )}
 
-                            {/* OPERATOR: MAINTENANCE → READY */}
-                            {user?.role === "OPERATOR" && locker.techStatus === "MAINTENANCE" && (
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    onClick={() => setReady(locker.lockerBoxId)}
-                                >
-                                    Repair → READY
-                                </Button>
-                            )}
-
-                            {/* ADMIN: READY → ACTIVE */}
-                            {user?.role === "ADMIN" && locker.techStatus === "READY" && (
-                                <Button
-                                    variant="contained"
-                                    color="success"
-                                    size="small"
-                                    onClick={() => activate(locker.lockerBoxId)}
-                                >
-                                    Activate
-                                </Button>
-                            )}
-
-                            {/* ADMIN: ACTIVE → MAINTENANCE */}
-                            {user?.role === "ADMIN" && locker.techStatus === "ACTIVE" && (
-                                <Button
-                                    variant="contained"
-                                    color="error"
-                                    size="small"
-                                    onClick={() => setMaintenance(locker.lockerBoxId)}
-                                >
-                                    → Maintenance
-                                </Button>
-                            )}
-
-                            {/* ADMIN: INACTIVE — ждём оператора */}
-                            {user?.role === "ADMIN" && locker.techStatus === "INACTIVE" && (
-                                <Typography variant="caption" color="text.secondary">
-                                    Awaiting operator activation
-                                </Typography>
-                            )}
-
-                            {/* ADMIN: MAINTENANCE — ждём оператора */}
-                            {user?.role === "ADMIN" && locker.techStatus === "MAINTENANCE" && (
-                                <Typography variant="caption" color="text.secondary">
-                                    Awaiting operator repair
+                            {/* ADMIN */}
+                            {user?.role === "ADMIN" && (
+                                <Typography variant="caption">
+                                    Admin controls station, not lockers
                                 </Typography>
                             )}
                         </Box>

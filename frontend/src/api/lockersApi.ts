@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { LockerBox, LockertechStatus } from "../types/index";
+import type { LockerBox, LockerTechStatus } from "../types/index";
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -32,10 +32,22 @@ export const lockersApi = {
         return data.data;
     },
 
-    //  ЕДИНСТВЕННЫЙ правильный метод
-    updateLockertechStatus: async (
+    // OPERATOR endpoint
+    updateLockerTechStatusOperator: async (
         id: string,
-        techStatus: LockertechStatus
+        techStatus: LockerTechStatus
+    ): Promise<LockerBox> => {
+        const { data } = await apiClient.patch<ApiResponse<LockerBox>>(
+            `/lockers/oper/boxes/${id}/tech-status`,
+            { techStatus }
+        );
+        return data.data;
+    },
+
+    // (если вдруг понадобится админ)
+    updateLockerTechStatusAdmin: async (
+        id: string,
+        techStatus: LockerTechStatus
     ): Promise<LockerBox> => {
         const { data } = await apiClient.patch<ApiResponse<LockerBox>>(
             `/lockers/admin/boxes/${id}/tech-status`,

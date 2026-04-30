@@ -35,7 +35,6 @@ enum LockerStatus {
 }
 
 enum TechnicalStatus {
-  READY
   ACTIVE
   INACTIVE
   MAINTENANCE

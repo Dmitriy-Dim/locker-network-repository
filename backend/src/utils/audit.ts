@@ -39,10 +39,16 @@ type AuditAction =
     | 'BOOKING_UPDATE_STATUS_FAILED'
     | "CITY_CREATE"
     | 'CITY_CREATE_FAILED'
+    | 'CITY_DELETE'
+    | 'CITY_DELETE_FAILED'
     | 'PRICE_CREATE'
     | 'PRICE_CREATE_FAILED'
     | 'PRICE_UPDATE'
-    | 'PRICE_UPDATE_FAILED';
+    | 'PRICE_UPDATE_FAILED'
+    | 'LOCKER_OPEN_USER'
+    | 'LOCKER_OPEN_USER_FAILED'
+    | 'LOCKER_CLOSE_USER'
+    | 'LOCKER_CLOSE_USER_FAILED';
 
 interface AuditParams {
     req: Request;

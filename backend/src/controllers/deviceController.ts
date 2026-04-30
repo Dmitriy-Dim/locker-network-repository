@@ -35,3 +35,4 @@ export const closeDeviceOper = async (req: Request, res: Response, next: NextFun
         next(e);
     }
 };
+

@@ -67,7 +67,7 @@ export default function AdminStationsPage() {
                                             color={
                                                 st.status === "ACTIVE"
                                                     ? "success"
-                                                    : st.status === "READY"
+                                                    : st.status === "INACTIVE"
                                                         ? "warning"
                                                         : st.status === "MAINTENANCE"
                                                             ? "error"
@@ -81,7 +81,7 @@ export default function AdminStationsPage() {
                                     </TableCell>
 
                                     <TableCell align="right">
-                                        {st.status === "READY" && (
+                                        {st.status === "ACTIVE" && (
                                             <Button
                                                 variant="contained"
                                                 size="small"

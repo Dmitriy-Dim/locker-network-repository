@@ -5,26 +5,24 @@
 export type StationStatus =
     | "ACTIVE"
     | "INACTIVE"
-    | "MAINTENANCE"
-    | "READY";
+    | "MAINTENANCE";
 
 // ================================
-// LOCKER TYPES (NEW MODEL)
+// LOCKER TYPES
 // ================================
 
 export type LockerSize = "S" | "M" | "L";
 
 // статус для пользователя
-export type LockerUserStatus =
+export type LockerStatus =
     | "AVAILABLE"
     | "RESERVED"
     | "OCCUPIED"
     | "EXPIRED";
 
 // технический статус (админ/оператор)
-export type LockertechStatus =
+export type LockerTechStatus =
     | "INACTIVE"
-    | "READY"
     | "ACTIVE"
     | "MAINTENANCE"
     | "FAULTY";
@@ -44,9 +42,8 @@ export interface LockerBox {
     code: string;
     size: LockerSize;
 
-    // РАЗДЕЛЕНИЕ СТАТУСОВ
-    status: LockerUserStatus | null;
-    techStatus: LockertechStatus;
+    status: LockerStatus | null;
+    techStatus: LockerTechStatus;
 }
 
 export interface LockerStation {
