@@ -35,10 +35,10 @@ export class CitiesServiceImplPostgres {
                         const cityExist = await tx.city.findUnique({
                             where: {code}
                         });
-                        if (cityExist && cityExist.isActive === true) {
+                        if (cityExist && cityExist.isActive) {
                             throw new HttpError(400, "City already exists");
                         }
-                        if (cityExist && cityExist.isActive === false){
+                        if (cityExist && !cityExist.isActive){
                             const city = await tx.city.update({
                                 where: {code},
                                 data: {isActive: true},
@@ -128,7 +128,7 @@ export class CitiesServiceImplPostgres {
                             throw new HttpError(404, "City not found");
                         }
 
-                        if (cityExist.isActive === false) {
+                        if (!cityExist.isActive) {
                             return { city: cityExist };
                         }
 
@@ -244,7 +244,7 @@ export class CitiesServiceImplPostgres {
                             },
                         });
 
-                        if (!cityExist || cityExist.isActive === false) {
+                        if (!cityExist || !cityExist.isActive) {
                             throw new HttpError(404, "City not found");
                         }
 
