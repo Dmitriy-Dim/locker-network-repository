@@ -18,7 +18,7 @@ export class CitiesServiceImplPostgres {
 
     async getAllCities(req: Request, res: Response) {
         const cities = await loadCitiesWithFallback();
-        return sendSuccess(res, cities);
+        return sendSuccess(res, cities);8
     }
 
     async createCities(req: Request, res: Response) {

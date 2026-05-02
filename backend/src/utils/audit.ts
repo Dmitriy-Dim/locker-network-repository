@@ -8,6 +8,8 @@ type AuditAction =
     | 'USER_LOGIN_FAILED'
     | 'USER_LOGOUT'
     | 'USER_REGISTER'
+    | 'USER_ROLE_UPDATE'
+    | 'USER_ROLE_UPDATE_FAILED'
     | 'TOKEN_REFRESH'
     | 'TOKEN_REVOKED'
     | 'OPERATION_CREATE'

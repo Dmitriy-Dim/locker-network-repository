@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 
 import { prismaService } from "./prismaService";
 import { HttpError } from "../errorHandler/HttpError";
+import {logAudit} from "../utils/audit";
+import {ActionType} from "./dto/operationDto";
 
 export class AdminActions {
 
@@ -20,31 +22,66 @@ export class AdminActions {
 
         const { role } = req.body as { role: Role };
 
-        const user = await prismaService.user.findUnique({
-            where: { userId: targetUserId },
-            select: {
-                userId: true,
-                role: true,
-            },
-        });
+        try {
+            const user = await prismaService.user.findUnique({
+                where: { userId: targetUserId },
+                select: {
+                    userId: true,
+                    role: true,
+                },
+            });
 
-        if (!user) {
-            throw new HttpError(404, "User not found");
+            if (!user) {
+                throw new HttpError(404, "User not found");
+            }
+
+            const updatedUser = await prismaService.user.update({
+                where: { userId: targetUserId },
+                data: { role },
+                select: {
+                    userId: true,
+                    role: true,
+                },
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.USER_ROLE_UPDATE,
+                actorId: req.user?.userId,
+                entityId: updatedUser.userId,
+                entityType: "User",
+                details: {
+                    old: {
+                        role: user.role,
+                    },
+                    new: {
+                        role: updatedUser.role,
+                    },
+                },
+            });
+
+            return res.status(200).json({
+                id: updatedUser.userId,
+                role: updatedUser.role,
+            });
+        } catch (e) {
+            await logAudit({
+                req,
+                action: ActionType.USER_ROLE_UPDATE_FAILED,
+                actorId: req.user?.userId,
+                entityId: targetUserId,
+                entityType: "User",
+                details: {
+                    reason: e instanceof Error ? e.message : "Unknown error",
+                },
+            });
+
+            if (e instanceof HttpError) {
+                throw e;
+            }
+
+            throw new HttpError(500, "Failed to update user role");
         }
-
-        const updatedUser = await prismaService.user.update({
-            where: { userId: targetUserId },
-            data: { role },
-            select: {
-                userId: true,
-                role: true,
-            },
-        });
-
-        return res.status(200).json({
-            id: updatedUser.userId,
-            role: updatedUser.role,
-        });
     }
 
     //--------------------getAllUsers

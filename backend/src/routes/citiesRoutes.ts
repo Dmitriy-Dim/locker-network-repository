@@ -4,13 +4,6 @@ import {Role} from "@prisma/client";
 import * as citiesController from "../controllers/citiesController";
 import * as auth from "../middleware/authMiddleware";
 import {authorize} from "../middleware/authMiddleware";
-import {validateRequest} from "../middleware/validateRequest";
-import {createCitySchema} from "../validation/citiesSchema";
-import * as adminActionsController from "../controllers/adminActionsController";
-import {adminRoutes} from "./adminRoutes";
-
-
-
 
 export const citiesRoutes = express.Router();
 
