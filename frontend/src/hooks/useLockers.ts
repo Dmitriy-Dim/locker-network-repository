@@ -10,37 +10,38 @@ interface ChangeLockerStatusPayload {
 export function useLockers() {
     const qc = useQueryClient();
 
-    const invalidateAll = () => {
-        qc.invalidateQueries({ queryKey: ["lockers"] });
-        qc.invalidateQueries({ queryKey: ["stations"] });
-        qc.invalidateQueries({ queryKey: ["station-details"] });
-        qc.invalidateQueries({ queryKey: ["operator-stations"] });
-        qc.invalidateQueries({ queryKey: ["bookings-my"] });
-        qc.invalidateQueries({ queryKey: ["my-bookings"] });
+    const invalidateAll = async () => {
+        await Promise.all([
+            qc.invalidateQueries({ queryKey: ["lockers"] }),
+            qc.invalidateQueries({ queryKey: ["stations"] }),
+            qc.invalidateQueries({ queryKey: ["station-details"] }),
+            qc.invalidateQueries({ queryKey: ["operator-station"] }),
+            qc.invalidateQueries({ queryKey: ["operator-stations"] }),
+            qc.invalidateQueries({ queryKey: ["bookings-my"] }),
+            qc.invalidateQueries({ queryKey: ["my-bookings"] }),
+        ]);
     };
 
-    // 🔧 tech status
     const changeStatus = useMutation({
         mutationFn: ({ lockerBoxId, techStatus }: ChangeLockerStatusPayload) =>
             lockersApi.updateLockerTechStatusOperator(lockerBoxId, techStatus),
-        onSuccess: invalidateAll,
+
+        onSuccess: async () => {
+            await invalidateAll();
+        },
+
         onError: (error) => {
             console.error("Locker status update failed", error);
         }
     });
 
-    // 🔧 booking cancel (Твоя логика)
     const cancelBookingMutation = useMutation({
         mutationFn: (bookingId: string) =>
             lockersApi.cancelBooking(bookingId),
 
-        onSuccess: invalidateAll,
-        onError: (e) => {
-            console.error("Cancel booking failed", e);
-        }
+        onSuccess: invalidateAll
     });
 
-    // helpers
     const activate = (id: string) =>
         changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "ACTIVE" });
 
@@ -54,13 +55,14 @@ export function useLockers() {
         changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "INACTIVE" });
 
     return {
-        // locker status
         changeLockerTechStatus: changeStatus.mutateAsync,
         isUpdating: changeStatus.isPending,
+
         activate,
         setMaintenance,
         setFaulty,
         setInactive,
+
         cancelBooking: cancelBookingMutation.mutateAsync
     };
 }

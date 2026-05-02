@@ -31,7 +31,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
     });
 
     const { user } = useAuth();
-    const { activate, setMaintenance, setFaulty } = useLockers();
+    const { activate, setMaintenance, setFaulty, setInactive, isUpdating } = useLockers();
 
     return (
         <Grid container spacing={2}>
@@ -49,28 +49,48 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
 
                         <Box mt={2} display="flex" flexDirection="column" gap={1}>
 
-                            {/* OPERATOR */}
+                            {/* OPERATOR ONLY */}
                             {user?.role === "OPERATOR" && (
                                 <>
                                     {locker.techStatus === "INACTIVE" && (
-                                        <Button onClick={() => activate(locker.lockerBoxId)}>
+                                        <Button
+                                            disabled={isUpdating}
+                                            onClick={() => activate(locker.lockerBoxId)}
+                                        >
                                             Activate
                                         </Button>
                                     )}
 
                                     {locker.techStatus === "ACTIVE" && (
                                         <>
-                                            <Button onClick={() => setMaintenance(locker.lockerBoxId)}>
+                                            <Button
+                                                disabled={isUpdating}
+                                                onClick={() => setMaintenance(locker.lockerBoxId)}
+                                            >
                                                 Maintenance
                                             </Button>
-                                            <Button onClick={() => setFaulty(locker.lockerBoxId)}>
+
+                                            <Button
+                                                disabled={isUpdating}
+                                                onClick={() => setFaulty(locker.lockerBoxId)}
+                                            >
                                                 Faulty
+                                            </Button>
+
+                                            <Button
+                                                disabled={isUpdating}
+                                                onClick={() => setInactive(locker.lockerBoxId)}
+                                            >
+                                                Deactivate
                                             </Button>
                                         </>
                                     )}
 
                                     {(locker.techStatus === "MAINTENANCE" || locker.techStatus === "FAULTY") && (
-                                        <Button onClick={() => activate(locker.lockerBoxId)}>
+                                        <Button
+                                            disabled={isUpdating}
+                                            onClick={() => activate(locker.lockerBoxId)}
+                                        >
                                             Restore → Active
                                         </Button>
                                     )}
@@ -79,8 +99,8 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
 
                             {/* ADMIN */}
                             {user?.role === "ADMIN" && (
-                                <Typography variant="caption">
-                                    Admin controls station, not lockers
+                                <Typography variant="caption" color="text.secondary">
+                                    Status managed by operator
                                 </Typography>
                             )}
                         </Box>
