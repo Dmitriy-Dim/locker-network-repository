@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
     Modal, Box, Typography, TextField, Button, MenuItem, Stack, IconButton, CircularProgress
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 import { stationsApi } from '../../../api/stationsApi';
-import { citiesApi } from '../../../api/citiesApi';
+import { useCities } from '../../../hooks/useCities';
 
 interface CreateStationModalProps {
     open: boolean;
@@ -35,12 +34,7 @@ const CreateStationModal: React.FC<CreateStationModalProps> = ({ open, onClose, 
     });
     const [loading, setLoading] = useState(false);
 
-
-    const { data: cities = [], isLoading: isLoadingCities } = useQuery({
-        queryKey: ['cities'],
-        queryFn: citiesApi.getAllCities,
-        enabled: open
-    });
+    const { cities, isLoading: isLoadingCities } = useCities();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -88,15 +82,15 @@ const CreateStationModal: React.FC<CreateStationModalProps> = ({ open, onClose, 
                             required
                             fullWidth
                             disabled={isLoadingCities}
-                            helperText={isLoadingCities ? "Loading cities..." : ""}
+                            helperText={isLoadingCities ? 'Loading cities...' : ''}
                         >
                             {isLoadingCities ? (
                                 <MenuItem disabled>
                                     <CircularProgress size={20} sx={{ mr: 1 }} /> Loading...
                                 </MenuItem>
                             ) : (
-                                cities.map((city) => (
-                                    <MenuItem key={city.cityId} value={city.code}>
+                                (cities ?? []).map((city) => (
+                                    <MenuItem key={city.id} value={city.code}>
                                         {city.name} ({city.code})
                                     </MenuItem>
                                 ))
@@ -118,7 +112,7 @@ const CreateStationModal: React.FC<CreateStationModalProps> = ({ open, onClose, 
                                 label="Latitude"
                                 name="latitude"
                                 type="number"
-                                inputProps={{ step: "any" }}
+                                inputProps={{ step: 'any' }}
                                 value={formData.latitude}
                                 onChange={handleChange}
                                 required
@@ -127,7 +121,7 @@ const CreateStationModal: React.FC<CreateStationModalProps> = ({ open, onClose, 
                                 label="Longitude"
                                 name="longitude"
                                 type="number"
-                                inputProps={{ step: "any" }}
+                                inputProps={{ step: 'any' }}
                                 value={formData.longitude}
                                 onChange={handleChange}
                                 required

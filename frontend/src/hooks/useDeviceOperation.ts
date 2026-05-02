@@ -1,30 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { devicesApi, type DeviceOperationData } from '../api/devicesApi';
 
-export function useDeviceOperation() {
+type Role = 'user' | 'operator';
+
+export function useDeviceOperation(role: Role = 'user') {
     const queryClient = useQueryClient();
     const [operationId, setOperationId] = useState<string | null>(null);
-    const [isLockerOpen, setIsLockerOpen] = useState(false);
-    const [isCancelling, setIsCancelling] = useState(false);
-    const lastProcessedOpRef = useRef<string | null>(null);
+    const [lockerOpenState, setLockerOpenState] = useState(false);
+    const processedOpsRef = useRef<Set<string>>(new Set());
+
+    const openFn =
+        role === 'operator'
+            ? (bookingId: string) =>
+                devicesApi.openLockerOperator({ mode: 'SINGLE', lockerBoxIds: [bookingId], reason: 'operator action' })
+            : devicesApi.openLockerUser;
+
+    const closeFn =
+        role === 'operator' ? devicesApi.closeLockerOperator : devicesApi.closeLockerUser;
 
     const openMutation = useMutation({
-        mutationFn: (bookingId: string) => devicesApi.openLocker(bookingId),
+        mutationFn: (bookingId: string) => openFn(bookingId),
         onSuccess: (data) => setOperationId(data.operationId),
     });
 
     const closeMutation = useMutation({
-        mutationFn: (bookingId: string) => devicesApi.closeLocker(bookingId),
+        mutationFn: (bookingIdOrLockerBoxId: string) => closeFn(bookingIdOrLockerBoxId),
         onSuccess: (data) => setOperationId(data.operationId),
     });
 
     const cancelMutation = useMutation({
         mutationFn: (bookingId: string) => devicesApi.cancelBooking(bookingId),
-        onSuccess: (data) => {
-            setOperationId(data.operationId);
-            setIsCancelling(true);
-        },
+        onSuccess: (data) => setOperationId(data.operationId),
     });
 
     const { data: operationData, error: pollError } = useQuery<DeviceOperationData>({
@@ -36,25 +43,25 @@ export function useDeviceOperation() {
             if (status === 'SUCCESS' || status === 'FAILED') return false;
             return 2000;
         },
-    });
+        select: (data) => {
 
-    useEffect(() => {
-        if (operationData?.status !== 'SUCCESS') return;
-        if (operationData.operationId === lastProcessedOpRef.current) return;
-        lastProcessedOpRef.current = operationData.operationId;
-        /* eslint-disable react-hooks/set-state-in-effect */
-        if (operationData.type === 'LOCKER_OPEN') setIsLockerOpen(true);
-        if (operationData.type === 'LOCKER_CLOSE') setIsLockerOpen(false);
-        if (operationData.type === 'BOOKING_CANCEL') {
-            setIsCancelling(false);
-            queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
-        }
-        /* eslint-enable react-hooks/set-state-in-effect */
-    }, [operationData?.status, operationData?.operationId, operationData?.type, queryClient]);
+            if (data.status === 'SUCCESS' && !processedOpsRef.current.has(data.operationId)) {
+                processedOpsRef.current.add(data.operationId);
+
+                if (data.type === 'LOCKER_OPEN' || data.type === 'LOCKER_OPEN_BATCH') {
+                    setLockerOpenState(true);
+                } else if (data.type === 'LOCKER_CLOSE') {
+                    setLockerOpenState(false);
+                } else if (data.type === 'BOOKING_CANCEL') {
+                    queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+                }
+            }
+            return data;
+        },
+    });
 
     const resetOperation = () => {
         setOperationId(null);
-        lastProcessedOpRef.current = null;
     };
 
     const isWorking =
@@ -63,13 +70,18 @@ export function useDeviceOperation() {
         cancelMutation.isPending ||
         (!!operationData && (operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
 
+    const isCancelling =
+        cancelMutation.isPending ||
+        (operationData?.type === 'BOOKING_CANCEL' &&
+            (operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
+
     return {
         openLocker: openMutation.mutateAsync,
         closeLocker: closeMutation.mutateAsync,
         cancelBookingDevice: cancelMutation.mutateAsync,
         resetOperation,
         isWorking,
-        isLockerOpen,
+        isLockerOpen: lockerOpenState,
         isCancelling,
         operationError: operationData?.status === 'FAILED' ? operationData : null,
         error: openMutation.error || closeMutation.error || cancelMutation.error || pollError,

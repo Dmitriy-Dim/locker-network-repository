@@ -13,9 +13,8 @@ import DashboardLayout from "../layout/DashboardLayout.tsx";
 
 // PAGES
 import { Location } from "../modules/shared/pages/Location.tsx";
-import { AdminDashboard } from "../modules/admin/pages/AdminDashboardPage.tsx";
 import StationDetailsPage from "../modules/admin/pages/StationDetailsPage.tsx";
-
+import { AdminDashboardPage } from "../modules/admin/pages/AdminDashboardPage.tsx";
 // USER PAGES
 import UserDashboardPage from "../modules/user/pages/UserDashboardPage.tsx";
 import MyBookingsPage from "../modules/user/pages/MyBookingsPage.tsx";
@@ -77,7 +76,7 @@ export function AppRoutes() {
                     </ProtectedRoute>
                 }
             >
-                <Route index element={<AdminDashboard />} />
+                <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUsersTables />} />
                 <Route path="stations/:stationId" element={<StationDetailsPage />} />
             </Route>
