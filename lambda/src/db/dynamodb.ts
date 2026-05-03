@@ -8,6 +8,7 @@ import {
   QueryCommand,
   TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { LockStatus, DoorStatus } from '../types/contracts/LockerContracts';
  
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -116,6 +117,38 @@ export const findAvailableLocker = async (stationId: string, size: string) => {
   return result.Items?.[0] || null;
 };
  
+export const getLockerDeviceState = async (
+  lockerBoxId: string,
+): Promise<{ lockStatus: LockStatus; doorStatus: DoorStatus } | null> => {
+  const result = await docClient.send(new GetCommand({
+    TableName: LOCKER_CACHE_TABLE,
+    Key: { lockerBoxId },
+  }));
+
+  if (!result.Item) return null;
+
+  return {
+    lockStatus: result.Item.lockStatus as LockStatus,
+    doorStatus: result.Item.doorStatus as DoorStatus,
+  };
+};
+
+export const updateLockerDeviceState = async (
+  lockerBoxId: string,
+  lockStatus: LockStatus,
+  doorStatus: DoorStatus,
+) => {
+  await docClient.send(new UpdateCommand({
+    TableName: LOCKER_CACHE_TABLE,
+    Key: { lockerBoxId },
+    UpdateExpression: 'SET lockStatus = :lockStatus, doorStatus = :doorStatus',
+    ExpressionAttributeValues: {
+      ':lockStatus': lockStatus,
+      ':doorStatus': doorStatus,
+    },
+  }));
+};
+
 export const updateLockerStatus = async (lockerBoxId: string, status: string) => {
   await docClient.send(new UpdateCommand({
     TableName: LOCKER_CACHE_TABLE,
