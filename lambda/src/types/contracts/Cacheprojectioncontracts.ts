@@ -1,3 +1,5 @@
+import { LockStatus, DoorStatus } from './LockerContracts';
+
 export type CacheEntityType = 'locker_cache';
 export type CacheEventType = 'UPSERT' | 'DELETE';
 export type LockerSize = 'S' | 'M' | 'L';
@@ -28,6 +30,8 @@ export interface LockerCachePayload {
   code: string;
   size: LockerSize;
   status: LockerStatus;
+  lockStatus: LockStatus;
+  doorStatus: DoorStatus;
   version: number;
   lastStatusChangedAt: string;
   pricePerHour: string | null;
