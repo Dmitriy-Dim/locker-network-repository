@@ -61,15 +61,28 @@ export class PricingServiceImplPostgres {
 
 
     async getAllPrices(req: Request, res: Response) {
+        const cityId = req.query.cityId as string;
+        const size = req.query.size as LockerSize;
+
         const prices = await prismaService.pricing.findMany({
+            where: {
+                ...(cityId && { cityId }),
+                ...(size && { size }),
+            },
             include: {
                 city: {
-                    select: { code : true, name : true },
-                   },
-            }
+                    select: { code: true, name: true },
+                },
+            },
         });
 
-        return res.json(prices);
+
+        const result = prices.map(p => ({
+            ...p,
+            pricePerHour: Number(p.pricePerHour),
+        }));
+
+        return res.json(result);
     }
 
     async createPrice(req: Request, res: Response) {
@@ -198,7 +211,10 @@ export class PricingServiceImplPostgres {
                     });
                     return {
                         statusCode: 200,
-                        body: {newPrice: result.price },
+                        body: {newPrice: {
+                                ...result.price,
+                                pricePerHour: Number(result.price.pricePerHour),
+                            }},
                         meta: cacheSync,
                     };
                 } catch (e) {

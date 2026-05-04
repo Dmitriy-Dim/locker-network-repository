@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { LockerStation, StationStatus } from "../types/index";
+import type { LockerStation } from "../types/index";
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -11,7 +11,7 @@ export interface ApiResponse<T> {
 export const stationsApi = {
 
     // ===============================
-    // ADMIN
+    // ADMIN (ONLY CREATE / READ)
     // ===============================
 
     getAllStations: async (): Promise<LockerStation[]> => {
@@ -41,19 +41,8 @@ export const stationsApi = {
         return data.data;
     },
 
-    updateStationStatusAdmin: async (
-        id: string,
-        status: Extract<StationStatus, "ACTIVE" | "MAINTENANCE">
-    ): Promise<LockerStation> => {
-        const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
-            `/lockers/admin/stations/${id}/status`,
-            { status }
-        );
-        return data.data;
-    },
-
     // ===============================
-    // OPERATOR
+    // OPERATOR (STATUS MANAGEMENT)
     // ===============================
 
     getOperatorStations: async (): Promise<LockerStation[]> => {
@@ -70,12 +59,23 @@ export const stationsApi = {
         return data.data;
     },
 
+    updateStationStatusOperator: async (
+        id: string,
+        status: "ACTIVE" | "MAINTENANCE"
+    ): Promise<LockerStation> => {
+        const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
+            `/lockers/oper/stations/${id}/status`,
+            { status }
+        );
+        return data.data;
+    },
+
     deleteStation: async (id: string): Promise<void> => {
         await apiClient.patch(`/lockers/oper/stations/${id}/delete`);
     },
 
     // ===============================
-    // PUBLIC / USER
+    // PUBLIC
     // ===============================
 
     getActiveStations: async (): Promise<LockerStation[]> => {
@@ -96,7 +96,7 @@ export const stationsApi = {
     },
 
     // ===============================
-    // LOCKERS
+    // LOCKERS (ADMIN ONLY CREATE)
     // ===============================
 
     addLocker: async (payload: {

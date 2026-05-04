@@ -110,6 +110,38 @@ export type CloseLockerUserCommand = {
     };
 };
 
+export type OpenLockerOperatorCommand = {
+    operationId: string;
+    type: OperationType.LOCKER_OPEN_BATCH;
+    payload: {
+        actorId: string;
+        actorRole: string;
+        stationId: string;
+        mode: string;
+        status: string | undefined;
+        lockerBoxIds: string[];
+        reason: string;
+        clientRequestId: string;
+        requestedAt: string;
+    };
+};
+
+export type CloseLockerOperatorCommand = {
+    operationId: string;
+    type: OperationType.LOCKER_CLOSE_BATCH;
+    payload: {
+        actorId: string;
+        actorRole: string;
+        stationId: string;
+        mode: string;
+        status: string | undefined;
+        lockerBoxIds: string[];
+        reason: string;
+        clientRequestId: string;
+        requestedAt: string;
+    };
+};
+
 type LockerCacheProjectionEvent =
     | {
         eventId: string;
@@ -235,6 +267,14 @@ export async function sendOpenLockerUserCommand(command: OpenLockerUserCommand) 
 }
 
 export async function sendCloseLockerUserCommand(command: CloseLockerUserCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendOpenLockerOperatorCommand(command: OpenLockerOperatorCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendCloseLockerOperatorCommand(command: CloseLockerOperatorCommand) {
     await sendCommandToQueue(command);
 }
 

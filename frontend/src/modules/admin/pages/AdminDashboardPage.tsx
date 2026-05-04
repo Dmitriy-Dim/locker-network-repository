@@ -6,41 +6,24 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import LocationCityIcon from '@mui/icons-material/LocationCity';
 import { useStations } from '../../../hooks/useStations';
+import { useCities } from '../../../hooks/useCities';
 import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles.ts';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../../api/apiClient';
+import { CitiesManagerModal } from './../../shared/components/CitiesManagerModal';
 
-const SUPPORTED_CITIES = [
-    { code: 'PTK', name: 'Petah Tikva' },
-    { code: 'TLV', name: 'Tel Aviv' },
-    { code: 'JLM', name: 'Jerusalem' },
-    { code: 'BNB', name: 'Bnei Brak' },
-    { code: 'HLN', name: 'Holon' },
-    { code: 'ASH', name: 'Ashdod' },
-    { code: 'NTY', name: 'Netanya' },
-    { code: 'RSL', name: 'Rishon LeZion' },
-    { code: 'HFA', name: 'Haifa' },
-    { code: 'B7',  name: 'Beer Sheva' },
-    { code: 'TBR', name: 'Tiberias' },
-    { code: 'NHR', name: 'Nahariya' }
-];
-
-export function AdminDashboard() {
+export function AdminDashboardPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { stations, createStation, deleteStation, refresh } = useStations();
+    const { stations, createStation, deleteStation } = useStations();
+    const { cities, isLoading: citiesLoading } = useCities();
 
     const [open, setOpen] = useState(false);
+    const [citiesModalOpen, setCitiesModalOpen] = useState(false);
     const [formData, setFormData] = useState({ cityCode: '', address: '', latitude: '', longitude: '' });
     const [error, setError] = useState<string | null>(null);
-
-    const [isReconciling, setIsReconciling] = useState(false);
-    const [reconcileResult, setReconcileResult] = useState<any>(null);
-
 
     const handleCreate = async () => {
         setError(null);
@@ -89,24 +72,6 @@ export function AdminDashboard() {
         setError(null);
     };
 
-
-    const handleEmergencyUpdate = async () => {
-        setIsReconciling(true);
-        try {
-            const response = await apiClient.post('/lockers/admin/cache/reconcile');
-            setReconcileResult(response.data);
-        } catch (e: any) {
-            console.error("Reconciliation error:", e);
-                setReconcileResult({
-                success: false,
-                error: e.response?.data || e.message
-            });
-        } finally {
-            setIsReconciling(false);
-            refresh();
-        }
-    };
-
     return (
         <Box sx={{ maxWidth: '1100px', mx: 'auto', mt: 4 }}>
             <Typography variant="h4" fontWeight={900} textAlign="center" mb={4}>System Overview</Typography>
@@ -116,33 +81,29 @@ export function AdminDashboard() {
                     <Typography variant="h6" fontWeight={800}>Active Stations</Typography>
 
                     <Stack direction="row" spacing={2}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
-                            onClick={() => refresh()}
-                            sx={{ color: '#6baf5c', borderColor: '#6baf5c', borderRadius: 2, fontWeight: 700 }}
-                        >
-                            REFRESH
-                        </Button>
-
-                       {user?.role === ROLES.ADMIN && (
+                        {user?.role === ROLES.ADMIN && (
                             <>
                                 <Button
-                                    variant="contained"
-                                    startIcon={isReconciling ? <RefreshIcon sx={{ animation: 'spin 1s linear infinite' }} /> : <WarningAmberIcon />}
-                                    onClick={handleEmergencyUpdate}
-                                    disabled={isReconciling}
+                                    variant="outlined"
+                                    startIcon={<LocationCityIcon />}
+                                    onClick={() => setCitiesModalOpen(true)}
                                     sx={{
-                                        bgcolor: '#e53935',
+                                        color: '#6baf5c',
+                                        borderColor: '#6baf5c',
                                         borderRadius: 2,
                                         fontWeight: 700,
-                                        '&:hover': { bgcolor: '#c62828' }
+                                        '&:hover': { borderColor: '#5a9a4d', bgcolor: 'rgba(107,175,92,0.08)' }
                                     }}
                                 >
-                                    {isReconciling ? 'SYNCING...' : 'EMERGENCY DB UPDATE'}
+                                    ADD NEW CITY
                                 </Button>
 
-                                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)} sx={{ bgcolor: '#6baf5c', borderRadius: 2, fontWeight: 700 }}>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<AddIcon />}
+                                    onClick={() => setOpen(true)}
+                                    sx={{ bgcolor: '#6baf5c', borderRadius: 2, fontWeight: 700 }}
+                                >
                                     ADD NEW STATION
                                 </Button>
                             </>
@@ -167,7 +128,12 @@ export function AdminDashboard() {
                                     </TableCell>
                                     <TableCell>{s.address}</TableCell>
                                     <TableCell align="right">
-                                        <Button size="small" variant="contained" onClick={() => navigate(`stations/${s.stationId}`)} sx={{ bgcolor: '#6baf5c', mr: 1, borderRadius: 2 }}>
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            onClick={() => navigate(`stations/${s.stationId}`)}
+                                            sx={{ bgcolor: '#6baf5c', mr: 1, borderRadius: 2 }}
+                                        >
                                             Manage
                                         </Button>
 
@@ -184,7 +150,6 @@ export function AdminDashboard() {
                 </TableContainer>
             </Paper>
 
-
             <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
                 <DialogTitle sx={{ fontWeight: 800 }}>Create New Station</DialogTitle>
                 <DialogContent>
@@ -199,13 +164,15 @@ export function AdminDashboard() {
                             fullWidth
                             value={formData.cityCode}
                             onChange={e => {
-                                setFormData({...formData, cityCode: e.target.value});
+                                setFormData({ ...formData, cityCode: e.target.value });
                                 if (error) setError(null);
                             }}
+                            disabled={citiesLoading}
+                            helperText={citiesLoading ? 'Loading cities...' : (!cities || cities.length === 0 ? 'No cities available. Add cities first.' : '')}
                         >
-                            {SUPPORTED_CITIES.map((city) => (
-                                <MenuItem key={city.code} value={city.code}>
-                                    {city.name}
+                            {cities?.map((city) => (
+                                <MenuItem key={city.id} value={city.code}>
+                                    {city.name} ({city.code})
                                 </MenuItem>
                             ))}
                         </TextField>
@@ -214,7 +181,7 @@ export function AdminDashboard() {
                             label="Address"
                             fullWidth
                             value={formData.address}
-                            onChange={e => setFormData({...formData, address: e.target.value})}
+                            onChange={e => setFormData({ ...formData, address: e.target.value })}
                         />
                         <Stack direction="row" spacing={2}>
                             <TextField
@@ -222,14 +189,14 @@ export function AdminDashboard() {
                                 type="number"
                                 inputProps={{ step: "any" }}
                                 value={formData.latitude}
-                                onChange={e => setFormData({...formData, latitude: e.target.value})}
+                                onChange={e => setFormData({ ...formData, latitude: e.target.value })}
                             />
                             <TextField
                                 label="Lng"
                                 type="number"
                                 inputProps={{ step: "any" }}
                                 value={formData.longitude}
-                                onChange={e => setFormData({...formData, longitude: e.target.value})}
+                                onChange={e => setFormData({ ...formData, longitude: e.target.value })}
                             />
                         </Stack>
                     </Stack>
@@ -240,33 +207,10 @@ export function AdminDashboard() {
                 </DialogActions>
             </Dialog>
 
-
-            <Dialog open={!!reconcileResult} onClose={() => setReconcileResult(null)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ fontWeight: 800, color: reconcileResult?.success === false ? '#e53935' : '#1e293b' }}>
-                    Reconciliation Result
-                </DialogTitle>
-                <DialogContent>
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            bgcolor: '#1e293b',
-                            color: reconcileResult?.success === false ? '#ef4444' : '#10b981',
-                            p: 2,
-                            borderRadius: 2,
-                            overflowX: 'auto'
-                        }}
-                    >
-                        <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '14px' }}>
-                            {JSON.stringify(reconcileResult, null, 2)}
-                        </pre>
-                    </Paper>
-                </DialogContent>
-                <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setReconcileResult(null)} variant="contained" sx={{ bgcolor: '#6baf5c', fontWeight: 700 }}>
-                        CLOSE
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <CitiesManagerModal
+                isOpen={citiesModalOpen}
+                onClose={() => setCitiesModalOpen(false)}
+            />
         </Box>
     );
 }

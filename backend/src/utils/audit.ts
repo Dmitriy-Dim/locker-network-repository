@@ -8,6 +8,8 @@ type AuditAction =
     | 'USER_LOGIN_FAILED'
     | 'USER_LOGOUT'
     | 'USER_REGISTER'
+    | 'USER_ROLE_UPDATE'
+    | 'USER_ROLE_UPDATE_FAILED'
     | 'TOKEN_REFRESH'
     | 'TOKEN_REVOKED'
     | 'OPERATION_CREATE'
@@ -41,6 +43,8 @@ type AuditAction =
     | 'CITY_CREATE_FAILED'
     | 'CITY_DELETE'
     | 'CITY_DELETE_FAILED'
+    | 'CITY_UPDATE'
+    | 'CITY_UPDATE_FAILED'
     | 'PRICE_CREATE'
     | 'PRICE_CREATE_FAILED'
     | 'PRICE_UPDATE'
@@ -48,7 +52,11 @@ type AuditAction =
     | 'LOCKER_OPEN_USER'
     | 'LOCKER_OPEN_USER_FAILED'
     | 'LOCKER_CLOSE_USER'
-    | 'LOCKER_CLOSE_USER_FAILED';
+    | 'LOCKER_CLOSE_USER_FAILED'
+    | "LOCKER_OPEN_OPERATOR"
+    | 'LOCKER_OPEN_OPERATOR_FAILED'
+    | "LOCKER_CLOSE_OPERATOR"
+    | 'LOCKER_CLOSE_OPERATOR_FAILED';
 
 interface AuditParams {
     req: Request;

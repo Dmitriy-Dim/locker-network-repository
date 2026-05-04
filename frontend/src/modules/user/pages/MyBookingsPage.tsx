@@ -11,30 +11,36 @@ import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
 
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
+
 export default function MyBookingsPage() {
     const navigate = useNavigate();
     const { data: bookings = [], isLoading } = useMyBookings();
     const [tabIndex, setTabIndex] = useState(0);
+    const [now] = useState(() => Date.now());
+
     const safeBookings = Array.isArray(bookings) ? bookings : [];
     const activeBookings: any[] = [];
     const actionRequiredBookings: any[] = [];
     const historyBookings: any[] = [];
 
-    const [now] = useState(() => Date.now());
-
     safeBookings.forEach((b: any) => {
-
         if (b.bookingStatus === "COMPLETED" || b.bookingStatus === "CANCELLED") {
             historyBookings.push(b);
             return;
         }
+
         const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
-        const isTimeExpired = endTime && endTime <= now;
+        const isTimeExpired = endTime !== null && endTime <= now;
+        const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
 
         if (b.bookingStatus === "EXPIRED" || isTimeExpired) {
-            actionRequiredBookings.push(b);
-        }
-        else {
+            if (isExpiredLongAgo) {
+                historyBookings.push(b);
+            } else {
+                actionRequiredBookings.push(b);
+            }
+        } else {
             activeBookings.push(b);
         }
     });
@@ -120,7 +126,6 @@ export default function MyBookingsPage() {
                 />
                 <Tab label="History" sx={{ fontWeight: 700, textTransform: 'none', fontSize: '1.05rem' }} />
             </Tabs>
-
 
             {currentList.length > 0 ? (
                 <Stack spacing={2}>

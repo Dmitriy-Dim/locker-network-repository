@@ -2,15 +2,25 @@ import { apiClient } from "./apiClient";
 
 export interface DeviceOperationData {
     operationId: string;
-    type: "LOCKER_OPEN" | "LOCKER_CLOSE" | "BOOKING_CANCEL";
+    type: "LOCKER_OPEN" | "LOCKER_CLOSE" | "LOCKER_OPEN_BATCH" | "BOOKING_CANCEL";
     status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
-    bookingId: string;
+    bookingId?: string;
     lockerBoxId?: string;
+    stationId?: string;
     result?: {
         lockStatus: "UNLOCKED" | "LOCKED";
         doorStatus: "OPEN" | "CLOSED";
+        attemptCount?: number;
+        maxAttempts?: number;
+        nextAction?: "CHANGE_LOCKER" | "CLOSE_LOCKER" | "NONE";
         message?: string;
-        nextAction?: string;
+        mode?: string;
+        status?: string;
+        total?: number;
+        openedCount?: number;
+        failedCount?: number;
+        opened?: any[];
+        failed?: any[];
     };
     errorCode?: string;
     errorMessage?: string;
@@ -24,16 +34,41 @@ export interface DeviceOperationResponse {
 }
 
 export const devicesApi = {
-    openLocker: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', { bookingId });
+    // --- USER ---
+    openLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', {
+            bookingId,
+            clientRequestId: crypto.randomUUID()
+        });
         return data.data;
     },
 
-    closeLocker: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', { bookingId });
+    closeLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', {
+            bookingId,
+            clientRequestId: crypto.randomUUID()
+        });
         return data.data;
     },
 
+    // --- OPERATOR ---
+    openLockerOperator: async (payload: { stationId?: string; mode: string; lockerBoxIds?: string[]; status?: string; reason: string }): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/open-locker', {
+            ...payload,
+            clientRequestId: crypto.randomUUID()
+        });
+        return data.data;
+    },
+
+    closeLockerOperator: async (lockerBoxId: string): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', {
+            lockerBoxId,
+            clientRequestId: crypto.randomUUID()
+        });
+        return data.data;
+    },
+
+    // --- GENERAL ---
     cancelBooking: async (bookingId: string): Promise<DeviceOperationData> => {
         const { data } = await apiClient.post<DeviceOperationResponse>(`/bookings/${bookingId}/cancel`);
         return data.data;

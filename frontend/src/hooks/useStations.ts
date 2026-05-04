@@ -1,11 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
-import type { LockerStation, StationStatus } from "../types/index";
-
-interface ChangeStationStatusPayload {
-    id: string;
-    status: StationStatus;
-}
+import { useAuth } from "./useAuth";
+import type { LockerStation } from "../types/index";
 
 interface CreateStationPayload {
     city: string;
@@ -16,46 +12,45 @@ interface CreateStationPayload {
 
 export function useStations(options?: { publicOnly?: boolean }) {
     const qc = useQueryClient();
+    const { user } = useAuth();
+
     const isPublic = options?.publicOnly;
+    const isOperator = user?.role === "OPERATOR";
+    const isAdmin = user?.role === "ADMIN";
+
+    // ===============================
+    // QUERY (роль-зависимая)
+    // ===============================
 
     const query = useQuery<LockerStation[]>({
-        queryKey: ["stations", isPublic ? "active" : "all"],
-        queryFn: isPublic
-            ? stationsApi.getActiveStations
-            : stationsApi.getAllStations,
+        queryKey: [
+            isPublic
+                ? "public-stations"
+                : isOperator
+                    ? "operator-stations"
+                    : "admin-stations"
+        ],
+        queryFn: () => {
+            if (isPublic) return stationsApi.getActiveStations();
+            if (isOperator) return stationsApi.getOperatorStations();
+            return stationsApi.getAllStations(); // admin
+        },
     });
 
     const invalidateAll = () => {
-        qc.invalidateQueries({ queryKey: ["stations"] });
-        qc.invalidateQueries({ queryKey: ["station-details"] });
+        qc.invalidateQueries({ queryKey: ["public-stations"] });
         qc.invalidateQueries({ queryKey: ["operator-stations"] });
-        qc.invalidateQueries({ queryKey: ["user-station"] });
-        qc.invalidateQueries({ queryKey: ["bookings-my"] });
+        qc.invalidateQueries({ queryKey: ["admin-stations"] });
+        qc.invalidateQueries({ queryKey: ["station-details"] });
     };
+
+    // ===============================
+    // ADMIN ACTIONS
+    // ===============================
 
     const create = useMutation({
         mutationFn: (payload: CreateStationPayload) =>
             stationsApi.createStation(payload),
-        onSuccess: invalidateAll,
-    });
-
-    const remove = useMutation({
-        mutationFn: (id: string) => stationsApi.deleteStation(id),
-        onSuccess: invalidateAll,
-    });
-
-    const changeStatus = useMutation({
-        mutationFn: ({ id, status }: ChangeStationStatusPayload) => {
-            // if (status === "READY") {
-            //     return stationsApi.updateStationStatusOperator(id, status);
-            // }
-
-            if (status === "ACTIVE" || status === "MAINTENANCE") {
-                return stationsApi.updateStationStatusAdmin(id, status);
-            }
-
-            throw new Error("Invalid status transition");
-        },
         onSuccess: invalidateAll,
     });
 
@@ -68,15 +63,46 @@ export function useStations(options?: { publicOnly?: boolean }) {
         onSuccess: invalidateAll,
     });
 
+    // ===============================
+    // OPERATOR ACTIONS
+    // ===============================
+
+    const changeStatus = useMutation({
+        mutationFn: ({ id, status }: { id: string; status: "ACTIVE" | "MAINTENANCE" }) => {
+            if (!isOperator) {
+                throw new Error("Only operator can change station status");
+            }
+            return stationsApi.updateStationStatusOperator(id, status);
+        },
+        onSuccess: invalidateAll,
+    });
+
+    const remove = useMutation({
+        mutationFn: (id: string) => {
+            if (!isOperator) {
+                throw new Error("Only operator can delete station");
+            }
+            return stationsApi.deleteStation(id);
+        },
+        onSuccess: invalidateAll,
+    });
+
+    // ===============================
+    // RETURN
+    // ===============================
+
     return {
         stations: query.data ?? [],
         isLoading: query.isLoading,
         error: query.error,
 
-        createStation: create.mutateAsync,
-        deleteStation: remove.mutate,
-        changeStationStatus: changeStatus.mutate,
-        addLocker: addLocker.mutateAsync,
+        // ADMIN
+        createStation: isAdmin ? create.mutateAsync : undefined,
+        addLocker: isAdmin ? addLocker.mutateAsync : undefined,
+
+        // OPERATOR
+        changeStationStatus: isOperator ? changeStatus.mutateAsync : undefined,
+        deleteStation: isOperator ? remove.mutateAsync : undefined,
 
         refresh: invalidateAll,
     };

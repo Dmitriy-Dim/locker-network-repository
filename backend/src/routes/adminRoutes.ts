@@ -11,7 +11,7 @@ export const adminRoutes = express.Router();
 //change user role
 adminRoutes.patch('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.changeRole);
 
-//get all users as json
+//get all users as JSON
 adminRoutes.get('/',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
 
 

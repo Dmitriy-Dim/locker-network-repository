@@ -12,7 +12,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { useAuth } from "../../../hooks/useAuth";
 import { ROLES } from "../../../config/roles/roles";
-import { useLockers } from "../../../hooks/useLockers";
 import type { LockerStation } from "../../../types/index";
 
 const getChipColor = (
@@ -32,7 +31,6 @@ export default function StationDetailsPage() {
     const { stationId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { changeLockerTechStatus } = useLockers();
     const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
@@ -100,54 +98,16 @@ export default function StationDetailsPage() {
                             />
 
                             {user?.role === ROLES.ADMIN && (
-                                <Box mt={2} display="flex" flexDirection="column" gap={1}>
-
-                                    {locker.techStatus === "ACTIVE" && (
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            onClick={async () => {
-                                                try {
-                                                    await changeLockerTechStatus({
-                                                        lockerBoxId: locker.lockerBoxId,
-                                                        techStatus: "ACTIVE"
-                                                    });
-                                                } catch (e) {
-                                                    console.error(e);
-                                                }
-                                            }}
-                                        >
-                                            Activate
-                                        </Button>
-                                    )}
-
-                                    {locker.techStatus === "ACTIVE" && (
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            color="error"
-                                            onClick={async () => {
-                                                try {
-                                                    await changeLockerTechStatus({
-                                                        lockerBoxId: locker.lockerBoxId,
-                                                        techStatus: "MAINTENANCE"
-                                                    });
-                                                } catch (e) {
-                                                    console.error(e);
-                                                }
-                                            }}
-                                        >
-                                            Maintenance
-                                        </Button>
-                                    )}
-                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Status managed by operator
+                                </Typography>
                             )}
                         </Paper>
                     </Grid>
                 ))}
             </Grid>
 
-            {/* FIXED DIALOG */}
+
             <Dialog open={open} onClose={() => setOpen(false)}>
                 <DialogTitle>Add Locker</DialogTitle>
 

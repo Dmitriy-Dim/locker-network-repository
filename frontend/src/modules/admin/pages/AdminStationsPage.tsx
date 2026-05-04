@@ -8,14 +8,11 @@ import {
     TableRow,
     TableCell,
     TableBody,
-    Chip,
-    Button
+    Chip
 } from "@mui/material";
 import { useStations } from "../../../hooks/useStations";
 import { AdminStationForm } from "./AdminStationForm";
-import type { StationStatus } from "../../../types/lockers/lockers";
 
-const BRAND_GREEN = '#6baf5c';
 
 type CreateStationPayload = {
     city: string;
@@ -27,8 +24,7 @@ type CreateStationPayload = {
 export default function AdminStationsPage() {
     const {
         stations,
-        createStation,
-        changeStationStatus
+        createStation
     } = useStations();
 
     const handleSave = async (data: CreateStationPayload) => {
@@ -38,7 +34,9 @@ export default function AdminStationsPage() {
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
             <Stack spacing={4}>
-                <Typography variant="h4" fontWeight={800}>Station Management</Typography>
+                <Typography variant="h4" fontWeight={800}>
+                    Station Management
+                </Typography>
 
                 <AdminStationForm onSave={handleSave} />
 
@@ -81,38 +79,10 @@ export default function AdminStationsPage() {
                                     </TableCell>
 
                                     <TableCell align="right">
-                                        {st.status === "ACTIVE" && (
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                sx={{ bgcolor: BRAND_GREEN, fontWeight: 700 }}
-                                                onClick={() =>
-                                                    changeStationStatus({
-                                                        id: st.stationId,
-                                                        status: "ACTIVE" as StationStatus
-                                                    })
-                                                }
-                                            >
-                                                Activate
-                                            </Button>
-                                        )}
-
-                                        {st.status === "ACTIVE" && (
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                color="error"
-                                                sx={{ fontWeight: 700 }}
-                                                onClick={() =>
-                                                    changeStationStatus({
-                                                        id: st.stationId,
-                                                        status: "MAINTENANCE" as StationStatus
-                                                    })
-                                                }
-                                            >
-                                                Maintenance
-                                            </Button>
-                                        )}
+                                        {/* ❗ ADMIN НЕ МЕНЯЕТ СТАТУСЫ */}
+                                        <Typography variant="caption" color="text.secondary">
+                                            Status managed by operator
+                                        </Typography>
                                     </TableCell>
                                 </TableRow>
                             ))}
