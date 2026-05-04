@@ -18,7 +18,7 @@ export class CitiesServiceImplPostgres {
 
     async getAllCities(req: Request, res: Response) {
         const cities = await loadCitiesWithFallback();
-        return sendSuccess(res, cities);8
+        return sendSuccess(res, cities);
     }
 
     async createCities(req: Request, res: Response) {
@@ -331,7 +331,24 @@ export class CitiesServiceImplPostgres {
     }
 
     async getSoftDeletedCities(req: Request, res: Response) {
-        return Promise.resolve(undefined);
+        const cities = await prismaService.city.findMany({
+            where: {
+                isActive: false,
+            },
+            select: {
+                cityId: true,
+                code: true,
+                name: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+            orderBy: {
+                updatedAt: "desc",
+            },
+        });
+
+        return sendSuccess(res, cities);
     }
 
     async restoreSoftDeletedCities(req: Request, res: Response) {
