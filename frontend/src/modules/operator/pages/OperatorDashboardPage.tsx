@@ -55,7 +55,7 @@ export default function OperatorDashboardPage() {
                                 <TableCell>
                                     <Select
                                         size="small"
-                                        value={s.status === "INACTIVE" ? "ACTIVE" : s.status}
+                                        value={s.status}
                                         onChange={(e) =>
                                             handleChange(
                                                 s.stationId,
@@ -63,6 +63,13 @@ export default function OperatorDashboardPage() {
                                             )
                                         }
                                     >
+                                        {/* показываем текущий статус */}
+                                        {s.status === "INACTIVE" && (
+                                            <MenuItem value="INACTIVE">
+                                                INACTIVE
+                                            </MenuItem>
+                                        )}
+
                                         <MenuItem value="ACTIVE">ACTIVE</MenuItem>
                                         <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
                                     </Select>
