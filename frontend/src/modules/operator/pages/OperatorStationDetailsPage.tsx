@@ -3,8 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { useLockers } from "../../../hooks/useLockers";
 
-import type { LockerStation } from "../../../types/index";
-import { Box, Typography, Paper, Chip, Button } from "@mui/material";
+import type { LockerStation, LockerTechStatus } from "../../../types/index";
+import {
+    Box,
+    Typography,
+    Paper,
+    Chip,
+    Select,
+    MenuItem,
+    FormControl
+} from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
 const getChipColor = (status: string) => {
@@ -19,7 +27,7 @@ const getChipColor = (status: string) => {
 
 export default function OperatorStationDetailsPage() {
     const { stationId } = useParams();
-    const { activate, setMaintenance, setFaulty, setInactive, isUpdating } = useLockers();
+    const { changeLockerTechStatus } = useLockers();
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["operator-station", stationId],
@@ -28,6 +36,13 @@ export default function OperatorStationDetailsPage() {
     });
 
     const lockers = station?.lockers ?? [];
+
+    const handleChange = (lockerId: string, newStatus: LockerTechStatus) => {
+        changeLockerTechStatus({
+            lockerBoxId: lockerId,
+            techStatus: newStatus
+        });
+    };
 
     return (
         <Box sx={{ p: 3 }}>
@@ -43,53 +58,26 @@ export default function OperatorStationDetailsPage() {
                                 label={locker.techStatus}
                                 color={getChipColor(locker.techStatus)}
                                 size="small"
+                                sx={{ mt: 1 }}
                             />
 
-                            <Box mt={2} display="flex" flexDirection="column" gap={1}>
-
-                                {locker.techStatus === "INACTIVE" && (
-                                    <Button
-                                        disabled={isUpdating}
-                                        onClick={() => activate(locker.lockerBoxId)}
-                                    >
-                                        Activate
-                                    </Button>
-                                )}
-
-                                {locker.techStatus === "ACTIVE" && (
-                                    <>
-                                        <Button
-                                            disabled={isUpdating}
-                                            onClick={() => setMaintenance(locker.lockerBoxId)}
-                                        >
-                                            Maintenance
-                                        </Button>
-
-                                        <Button
-                                            disabled={isUpdating}
-                                            onClick={() => setFaulty(locker.lockerBoxId)}
-                                        >
-                                            Faulty
-                                        </Button>
-
-                                        <Button
-                                            disabled={isUpdating}
-                                            onClick={() => setInactive(locker.lockerBoxId)}
-                                        >
-                                            Deactivate
-                                        </Button>
-                                    </>
-                                )}
-
-                                {(locker.techStatus === "MAINTENANCE" || locker.techStatus === "FAULTY") && (
-                                    <Button
-                                        disabled={isUpdating}
-                                        onClick={() => activate(locker.lockerBoxId)}
-                                    >
-                                        Restore → Active
-                                    </Button>
-                                )}
-                            </Box>
+                            <FormControl fullWidth sx={{ mt: 2 }}>
+                                <Select
+                                    size="small"
+                                    value={locker.techStatus}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            locker.lockerBoxId,
+                                            e.target.value as LockerTechStatus
+                                        )
+                                    }
+                                >
+                                    <MenuItem value="INACTIVE">INACTIVE</MenuItem>
+                                    <MenuItem value="ACTIVE">ACTIVE</MenuItem>
+                                    <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
+                                    <MenuItem value="FAULTY">FAULTY</MenuItem>
+                                </Select>
+                            </FormControl>
                         </Paper>
                     </Grid>
                 ))}
