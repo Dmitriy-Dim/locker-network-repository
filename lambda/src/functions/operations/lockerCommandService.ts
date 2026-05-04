@@ -1,7 +1,9 @@
 import { LockerCommand, OperationType, OperationStatus } from '../../types/contracts/OperationContracts';
-import { LockerErrorCode } from '../../types/contracts/LockerContracts';
-import { updateOperationWithResult } from '../../db/dynamodb';
+import { LockerErrorCode, LockStatus, DoorStatus } from '../../types/contracts/LockerContracts';
+import { updateOperationWithResult, getLockerDeviceState, updateLockerDeviceState } from '../../db/dynamodb';
 import { simulateDeviceCommand } from './lockerDeviceSimulator';
+
+const MAX_ATTEMPTS = 3;
 
 const writeSuccess = (
   operationId: string,
@@ -37,6 +39,61 @@ const writeFailure = (
     timestamp: new Date().toISOString(),
   });
 
+interface AttemptResult {
+  success: boolean;
+  lockStatus: LockStatus;
+  doorStatus: DoorStatus;
+  attemptCount: number;
+  errorCode?: LockerErrorCode;
+  errorMessage?: string;
+}
+
+export const runOpenAttempts = async (lockerBoxId: string): Promise<AttemptResult> => {
+  let lockStatus: LockStatus = 'LOCKED';
+  let doorStatus: DoorStatus = 'CLOSED';
+  let errorCode: LockerErrorCode | undefined;
+  let errorMessage: string | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const deviceResult = await simulateDeviceCommand(lockerBoxId, OperationType.LOCKER_OPEN);
+    lockStatus = deviceResult.lockStatus;
+    doorStatus = deviceResult.doorStatus;
+    errorCode = deviceResult.errorCode;
+    errorMessage = deviceResult.errorMessage;
+
+    await updateLockerDeviceState(lockerBoxId, lockStatus, doorStatus);
+
+    if (deviceResult.success) {
+      return { success: true, lockStatus, doorStatus, attemptCount: attempt };
+    }
+  }
+
+  return { success: false, lockStatus, doorStatus, attemptCount: MAX_ATTEMPTS, errorCode, errorMessage };
+};
+
+const runCloseAttempts = async (lockerBoxId: string): Promise<AttemptResult> => {
+  let lockStatus: LockStatus = 'UNLOCKED';
+  let doorStatus: DoorStatus = 'OPEN';
+  let errorCode: LockerErrorCode | undefined;
+  let errorMessage: string | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const deviceResult = await simulateDeviceCommand(lockerBoxId, OperationType.LOCKER_CLOSE);
+    lockStatus = deviceResult.lockStatus;
+    doorStatus = deviceResult.doorStatus;
+    errorCode = deviceResult.errorCode;
+    errorMessage = deviceResult.errorMessage;
+
+    await updateLockerDeviceState(lockerBoxId, lockStatus, doorStatus);
+
+    if (deviceResult.success) {
+      return { success: true, lockStatus, doorStatus, attemptCount: attempt };
+    }
+  }
+
+  return { success: false, lockStatus, doorStatus, attemptCount: MAX_ATTEMPTS, errorCode, errorMessage };
+};
+
 export const handleLockerOpen = async (command: LockerCommand): Promise<void> => {
   const { operationId, payload } = command;
   const { userId, bookingId, lockerBoxId } = payload;
@@ -44,15 +101,37 @@ export const handleLockerOpen = async (command: LockerCommand): Promise<void> =>
   console.log(JSON.stringify({ action: 'LOCKER_OPEN_START', operationId, lockerBoxId, bookingId, userId }));
 
   try {
-    const deviceResult = await simulateDeviceCommand(lockerBoxId, OperationType.LOCKER_OPEN);
+    const deviceState = await getLockerDeviceState(lockerBoxId);
 
-    if (deviceResult.success) {
+    if (!deviceState || deviceState.lockStatus !== 'LOCKED' || deviceState.doorStatus !== 'CLOSED') {
+      const currentLock = deviceState?.lockStatus ?? 'UNKNOWN';
+      const currentDoor = deviceState?.doorStatus ?? 'UNKNOWN';
+      await writeFailure(
+        operationId,
+        OperationType.LOCKER_OPEN,
+        bookingId,
+        lockerBoxId,
+        { lockStatus: currentLock, doorStatus: currentDoor, attemptCount: 0, maxAttempts: MAX_ATTEMPTS },
+        LockerErrorCode.LOCKER_STATE_INVALID,
+        'Locker is not in expected state for opening',
+      );
+      console.log(JSON.stringify({ action: 'LOCKER_OPEN_INVALID_STATE', operationId, lockerBoxId, currentLock, currentDoor }));
+      return;
+    }
+
+    const { success, lockStatus, doorStatus, attemptCount, errorCode, errorMessage } =
+      await runOpenAttempts(lockerBoxId);
+
+    if (success) {
       await writeSuccess(operationId, OperationType.LOCKER_OPEN, bookingId, lockerBoxId, {
-        lockStatus: deviceResult.lockStatus,
-        doorStatus: deviceResult.doorStatus,
-        message: deviceResult.message,
+        lockStatus,
+        doorStatus,
+        attemptCount,
+        maxAttempts: MAX_ATTEMPTS,
+        nextAction: 'CLOSE_LOCKER',
+        message: 'Locker opened',
       });
-      console.log(JSON.stringify({ action: 'LOCKER_OPEN_SUCCESS', operationId, lockerBoxId }));
+      console.log(JSON.stringify({ action: 'LOCKER_OPEN_SUCCESS', operationId, lockerBoxId, attemptCount }));
       return;
     }
 
@@ -61,14 +140,14 @@ export const handleLockerOpen = async (command: LockerCommand): Promise<void> =>
       OperationType.LOCKER_OPEN,
       bookingId,
       lockerBoxId,
-      { lockStatus: deviceResult.lockStatus, doorStatus: deviceResult.doorStatus, nextAction: deviceResult.nextAction },
-      deviceResult.errorCode ?? LockerErrorCode.LOCK_OPEN_FAILED,
-      deviceResult.errorMessage ?? 'Locker open failed',
+      { lockStatus, doorStatus, attemptCount, maxAttempts: MAX_ATTEMPTS, nextAction: 'CHANGE_LOCKER' },
+      errorCode ?? LockerErrorCode.OPEN_ATTEMPTS_EXHAUSTED,
+      errorMessage ?? 'Locker failed to open after 3 attempts',
     );
-    console.log(JSON.stringify({ action: 'LOCKER_OPEN_FAILED', operationId, lockerBoxId, errorCode: deviceResult.errorCode }));
+    console.log(JSON.stringify({ action: 'LOCKER_OPEN_FAILED', operationId, lockerBoxId, attemptCount, errorCode }));
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unexpected device error';
+    const msg = err instanceof Error ? err.message : 'Unexpected device error';
     await writeFailure(
       operationId,
       OperationType.LOCKER_OPEN,
@@ -76,9 +155,9 @@ export const handleLockerOpen = async (command: LockerCommand): Promise<void> =>
       lockerBoxId,
       { lockStatus: 'UNKNOWN', doorStatus: 'UNKNOWN' },
       LockerErrorCode.DEVICE_SIMULATION_FAILED,
-      errorMessage,
+      msg,
     );
-    console.error(JSON.stringify({ action: 'LOCKER_OPEN_EXCEPTION', operationId, lockerBoxId, error: errorMessage }));
+    console.error(JSON.stringify({ action: 'LOCKER_OPEN_EXCEPTION', operationId, lockerBoxId, error: msg }));
   }
 };
 
@@ -89,15 +168,50 @@ export const handleLockerClose = async (command: LockerCommand): Promise<void> =
   console.log(JSON.stringify({ action: 'LOCKER_CLOSE_START', operationId, lockerBoxId, bookingId, userId }));
 
   try {
-    const deviceResult = await simulateDeviceCommand(lockerBoxId, OperationType.LOCKER_CLOSE);
+    const deviceState = await getLockerDeviceState(lockerBoxId);
 
-    if (deviceResult.success) {
+    if (deviceState?.lockStatus === 'LOCKED' && deviceState?.doorStatus === 'CLOSED') {
       await writeSuccess(operationId, OperationType.LOCKER_CLOSE, bookingId, lockerBoxId, {
-        lockStatus: deviceResult.lockStatus,
-        doorStatus: deviceResult.doorStatus,
-        message: deviceResult.message,
+        lockStatus: 'LOCKED',
+        doorStatus: 'CLOSED',
+        attemptCount: 0,
+        maxAttempts: MAX_ATTEMPTS,
+        nextAction: 'NONE',
+        message: 'Locker already closed',
       });
-      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_SUCCESS', operationId, lockerBoxId }));
+      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_IDEMPOTENT', operationId, lockerBoxId }));
+      return;
+    }
+
+    if (!deviceState || deviceState.lockStatus !== 'UNLOCKED' || deviceState.doorStatus !== 'OPEN') {
+      const currentLock = deviceState?.lockStatus ?? 'UNKNOWN';
+      const currentDoor = deviceState?.doorStatus ?? 'UNKNOWN';
+      await writeFailure(
+        operationId,
+        OperationType.LOCKER_CLOSE,
+        bookingId,
+        lockerBoxId,
+        { lockStatus: currentLock, doorStatus: currentDoor, attemptCount: 0, maxAttempts: MAX_ATTEMPTS },
+        LockerErrorCode.LOCKER_STATE_INVALID,
+        'Locker is not in expected state for closing',
+      );
+      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_INVALID_STATE', operationId, lockerBoxId, currentLock, currentDoor }));
+      return;
+    }
+
+    const { success, lockStatus, doorStatus, attemptCount, errorCode, errorMessage } =
+      await runCloseAttempts(lockerBoxId);
+
+    if (success) {
+      await writeSuccess(operationId, OperationType.LOCKER_CLOSE, bookingId, lockerBoxId, {
+        lockStatus,
+        doorStatus,
+        attemptCount,
+        maxAttempts: MAX_ATTEMPTS,
+        nextAction: 'NONE',
+        message: 'Locker closed',
+      });
+      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_SUCCESS', operationId, lockerBoxId, attemptCount }));
       return;
     }
 
@@ -106,14 +220,14 @@ export const handleLockerClose = async (command: LockerCommand): Promise<void> =
       OperationType.LOCKER_CLOSE,
       bookingId,
       lockerBoxId,
-      { lockStatus: deviceResult.lockStatus, doorStatus: deviceResult.doorStatus, nextAction: deviceResult.nextAction },
-      deviceResult.errorCode ?? LockerErrorCode.LOCK_CLOSE_FAILED,
-      deviceResult.errorMessage ?? 'Locker close failed',
+      { lockStatus, doorStatus, attemptCount, maxAttempts: MAX_ATTEMPTS, nextAction: 'CHANGE_LOCKER' },
+      errorCode ?? LockerErrorCode.CLOSE_ATTEMPTS_EXHAUSTED,
+      errorMessage ?? 'Locker failed to close after 3 attempts',
     );
-    console.log(JSON.stringify({ action: 'LOCKER_CLOSE_FAILED', operationId, lockerBoxId, errorCode: deviceResult.errorCode }));
+    console.log(JSON.stringify({ action: 'LOCKER_CLOSE_FAILED', operationId, lockerBoxId, attemptCount, errorCode }));
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unexpected device error';
+    const msg = err instanceof Error ? err.message : 'Unexpected device error';
     await writeFailure(
       operationId,
       OperationType.LOCKER_CLOSE,
@@ -121,8 +235,8 @@ export const handleLockerClose = async (command: LockerCommand): Promise<void> =
       lockerBoxId,
       { lockStatus: 'UNKNOWN', doorStatus: 'UNKNOWN' },
       LockerErrorCode.DEVICE_SIMULATION_FAILED,
-      errorMessage,
+      msg,
     );
-    console.error(JSON.stringify({ action: 'LOCKER_CLOSE_EXCEPTION', operationId, lockerBoxId, error: errorMessage }));
+    console.error(JSON.stringify({ action: 'LOCKER_CLOSE_EXCEPTION', operationId, lockerBoxId, error: msg }));
   }
 };
