@@ -6,9 +6,10 @@ import { handleHealthCheck } from './lambdaHealthService';
 import { handleSecurityEvent } from './securityEventService';
 import { handlePaymentConfirm } from '../booking/paymentConfirmService';
 import { BookingInitCommand, PaymentConfirmCommand, BookingExtendCommand } from '../../types/contracts/BookingContracts';
+import { LockerBatchCommand } from '../../types/contracts/OperationContracts';
 import { handleBookingExtend } from '../booking/bookingExtendService';
 import { handleBookingInit } from '../booking/bookingInitService';
-import { handleLockerOpen, handleLockerClose } from './lockerCommandService';
+import { handleLockerOpen, handleLockerClose, handleLockerOpenBatch } from './lockerCommandService';
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -54,6 +55,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         case OperationType.LOCKER_CLOSE:
           await handleLockerClose(command as unknown as LockerCommand);
+          break;
+
+        case OperationType.LOCKER_OPEN_BATCH:
+          await handleLockerOpenBatch(command as unknown as LockerBatchCommand);
           break;
 
         default:
