@@ -14,9 +14,10 @@ export const stationsApi = {
     // ADMIN (ONLY CREATE / READ)
     // ===============================
 
-    getAllStations: async (): Promise<LockerStation[]> => {
+    getAllStations: async (limit?: number): Promise<LockerStation[]> => {
         const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
-            "/lockers/admin/stations"
+            "/lockers/admin/stations",
+            { params: { limit } }
         );
         return data.data;
     },
@@ -45,31 +46,22 @@ export const stationsApi = {
     // OPERATOR (STATUS MANAGEMENT)
     // ===============================
 
-    getOperatorStations: async (): Promise<LockerStation[]> => {
+    getOperatorStations: async (limit?: number): Promise<LockerStation[]> => {
         const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
-            "/lockers/oper/stations"
+            "/lockers/oper/stations",
+            { params: { limit } }
         );
         return data.data;
     },
 
     getOperatorStationById: async (id: string): Promise<LockerStation> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation>>(
-            `/lockers/oper/stations/${id}`
-        );
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(`/lockers/oper/stations/${id}`);
         return data.data;
     },
-
-    updateStationStatusOperator: async (
-        id: string,
-        status: "ACTIVE" | "MAINTENANCE"
-    ): Promise<LockerStation> => {
-        const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
-            `/lockers/oper/stations/${id}/status`,
-            { status }
-        );
+    updateStationStatusOperator: async (id: string, status: "ACTIVE" | "MAINTENANCE"): Promise<LockerStation> => {
+        const { data } = await apiClient.patch<ApiResponse<LockerStation>>(`/lockers/oper/stations/${id}/status`, { status });
         return data.data;
     },
-
     deleteStation: async (id: string): Promise<void> => {
         await apiClient.patch(`/lockers/oper/stations/${id}/delete`);
     },
@@ -78,36 +70,25 @@ export const stationsApi = {
     // PUBLIC
     // ===============================
 
-    getActiveStations: async (): Promise<LockerStation[]> => {
+    getActiveStations: async (limit?: number): Promise<LockerStation[]> => {
         const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
             "/lockers/stations",
             {
-                params: { status: "ACTIVE" }
+                params: {
+                    status: "ACTIVE",
+                    limit
+                }
             }
         );
         return data.data;
     },
 
     getStationById: async (id: string): Promise<LockerStation> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation>>(
-            `/lockers/stations/${id}`
-        );
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(`/lockers/stations/${id}`);
         return data.data;
     },
-
-    // ===============================
-    // LOCKERS (ADMIN ONLY CREATE)
-    // ===============================
-
-    addLocker: async (payload: {
-        stationId: string;
-        code: string;
-        size: "S" | "M" | "L";
-    }): Promise<any> => {
-        const { data } = await apiClient.post<ApiResponse<any>>(
-            `/lockers/admin/boxes`,
-            payload
-        );
+    addLocker: async (payload: { stationId: string; code: string; size: "S" | "M" | "L"; }): Promise<any> => {
+        const { data } = await apiClient.post<ApiResponse<any>>(`/lockers/admin/boxes`, payload);
         return data.data;
     }
 };

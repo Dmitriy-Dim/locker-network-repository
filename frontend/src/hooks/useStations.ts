@@ -10,11 +10,12 @@ interface CreateStationPayload {
     longitude: number;
 }
 
-export function useStations(options?: { publicOnly?: boolean }) {
+export function useStations(options?: { publicOnly?: boolean; limit?: number }) {
     const qc = useQueryClient();
     const { user } = useAuth();
 
     const isPublic = options?.publicOnly;
+    const limit = options?.limit;
     const isOperator = user?.role === "OPERATOR";
     const isAdmin = user?.role === "ADMIN";
 
@@ -28,12 +29,13 @@ export function useStations(options?: { publicOnly?: boolean }) {
                 ? "public-stations"
                 : isOperator
                     ? "operator-stations"
-                    : "admin-stations"
+                    : "admin-stations",
+            limit
         ],
         queryFn: () => {
-            if (isPublic) return stationsApi.getActiveStations();
-            if (isOperator) return stationsApi.getOperatorStations();
-            return stationsApi.getAllStations(); // admin
+            if (isPublic) return stationsApi.getActiveStations(limit);
+            if (isOperator) return stationsApi.getOperatorStations(limit);
+            return stationsApi.getAllStations(limit);
         },
     });
 

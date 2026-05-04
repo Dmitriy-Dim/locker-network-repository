@@ -10,5 +10,6 @@ export enum Paths {
     LOCATION='/location',
     ADMIN='/admin',
     FORBIDDEN='/403',
+    PRICING_ADMIN='/admin/pricing'
 }
 

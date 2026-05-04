@@ -34,41 +34,26 @@ export interface DeviceOperationResponse {
 }
 
 export const devicesApi = {
-    // --- USER ---
     openLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', {
-            bookingId,
-            clientRequestId: crypto.randomUUID()
-        });
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', { bookingId });
         return data.data;
     },
 
     closeLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', {
-            bookingId,
-            clientRequestId: crypto.randomUUID()
-        });
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', { bookingId });
         return data.data;
     },
 
-    // --- OPERATOR ---
     openLockerOperator: async (payload: { stationId?: string; mode: string; lockerBoxIds?: string[]; status?: string; reason: string }): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/open-locker', {
-            ...payload,
-            clientRequestId: crypto.randomUUID()
-        });
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/open-locker', payload);
         return data.data;
     },
 
     closeLockerOperator: async (lockerBoxId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', {
-            lockerBoxId,
-            clientRequestId: crypto.randomUUID()
-        });
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', { lockerBoxId });
         return data.data;
     },
 
-    // --- GENERAL ---
     cancelBooking: async (bookingId: string): Promise<DeviceOperationData> => {
         const { data } = await apiClient.post<DeviceOperationResponse>(`/bookings/${bookingId}/cancel`);
         return data.data;

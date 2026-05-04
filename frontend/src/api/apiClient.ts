@@ -37,9 +37,9 @@ apiClient.interceptors.request.use((config) => {
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        // if (config.method && ['post', 'put', 'patch'].includes(config.method.toLowerCase())) {
-        //     config.headers['x-idempotency-key'] = crypto.randomUUID();
-        // }
+        if (config.method && ['post', 'put', 'patch'].includes(config.method.toLowerCase())) {
+            config.headers['Idempotency-Key'] = crypto.randomUUID();
+        }
     }
     return config;
 }, (error) => {

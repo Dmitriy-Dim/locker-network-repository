@@ -10,7 +10,7 @@ import { LocationsMapSection } from "../../user/pages/LocationsMapSection.tsx";
 export function Location() {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const { stations, isLoading } = useStations({ publicOnly: true });
+    const { stations, isLoading } = useStations({ publicOnly: true, limit: 1000 });
     const safeStations = Array.isArray(stations) ? stations : [];
     const activeStations = safeStations.filter(s => s.status === 'ACTIVE');
 

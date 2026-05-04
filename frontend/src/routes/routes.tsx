@@ -31,8 +31,10 @@ import OperatorDashboardPage from "../modules/operator/pages/OperatorDashboardPa
 import OperatorStationsPage from "../modules/operator/pages/OperatorStationsPage.tsx";
 import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStationDetailsPage.tsx";
 
-// ADMIN USERS PAGE
-import AdminUsersTables from "../modules/admin/pages/AdminUsersTables.tsx";
+// ADMIN PAGES
+import AdminUsersTables from "../modules/admin/pages/AdminUsersTables";
+
+import { PricingDashboard } from "../modules/admin/pages/PricingDashboard";
 
 export function AppRoutes() {
     return (
@@ -53,7 +55,7 @@ export function AppRoutes() {
             <Route
                 path="/payment/success"
                 element={
-                        <PaymentSuccess />
+                    <PaymentSuccess />
                 }
             />
             <Route
@@ -79,6 +81,7 @@ export function AppRoutes() {
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUsersTables />} />
                 <Route path="stations/:stationId" element={<StationDetailsPage />} />
+                <Route path="pricing" element={<PricingDashboard />} />
             </Route>
 
             {/* ================= OPERATOR ================= */}

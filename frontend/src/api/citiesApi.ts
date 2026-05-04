@@ -6,7 +6,7 @@ export interface CityPayload {
 }
 
 export interface City extends CityPayload {
-    id: string;
+    cityId: string;
 }
 
 export const citiesApi = {

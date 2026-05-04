@@ -19,6 +19,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
 
 import {useAuth} from '../hooks/useAuth.ts';
@@ -38,7 +39,6 @@ export default function DashboardLayout() {
         navigate(Paths.HOME);
     };
 
-
     const getMenuItems = () => {
         if (user?.role === ROLES.USER) {
             return [
@@ -47,26 +47,25 @@ export default function DashboardLayout() {
             ];
         }
 
-
         const dashboardPath = user?.role === ROLES.ADMIN ? Paths.ADMIN : Paths.OPERATOR;
 
         if(user?.role === ROLES.OPERATOR){
             return [
                 { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
-
                 { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
-
             ];
         }
+
         if(user?.role === ROLES.ADMIN){
             return [
                 { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
                 { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
                 { text: 'Users', path: dashboardPath+"/users", icon: <DashboardIcon /> },
+                { text: 'Pricing', path: Paths.PRICING_ADMIN, icon: <AttachMoneyIcon /> },
             ];
         }
 
-
+        return [];
     };
 
     const drawerContent = (
@@ -88,7 +87,6 @@ export default function DashboardLayout() {
                                 onClick={() => item.path !== '#' && navigate(item.path)}
                                 sx={{
                                     borderRadius: 3,
-
                                     bgcolor: isActive ? '#6baf5c' : 'transparent',
                                     color: isActive ? 'white' : '#64748b',
                                     transition: 'all 0.2s',
@@ -115,12 +113,10 @@ export default function DashboardLayout() {
 
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
-
             <AppBar
                 position="fixed"
                 elevation={0}
                 sx={{
-
                     width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
                     ml: { sm: `${DRAWER_WIDTH}px` },
                     bgcolor: 'white',
@@ -168,9 +164,7 @@ export default function DashboardLayout() {
                 </Toolbar>
             </AppBar>
 
-
             <Box component="nav" sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}>
-
                 <Drawer
                     variant="temporary"
                     open={mobileOpen}
@@ -190,9 +184,7 @@ export default function DashboardLayout() {
                 </Drawer>
             </Box>
 
-
             <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 4 }, width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` }, mt: '64px' }}>
-
                 <Box sx={{ maxWidth: '1100px', margin: '0 auto' }}>
                     <Outlet />
                 </Box>
