@@ -90,7 +90,7 @@ const CreateStationModal: React.FC<CreateStationModalProps> = ({ open, onClose, 
                                 </MenuItem>
                             ) : (
                                 (cities ?? []).map((city) => (
-                                    <MenuItem key={city.id} value={city.code}>
+                                    <MenuItem key={city.cityId} value={city.code}>
                                         {city.name} ({city.code})
                                     </MenuItem>
                                 ))

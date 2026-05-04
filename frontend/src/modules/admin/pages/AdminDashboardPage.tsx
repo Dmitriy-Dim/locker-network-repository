@@ -171,7 +171,7 @@ export function AdminDashboardPage() {
                             helperText={citiesLoading ? 'Loading cities...' : (!cities || cities.length === 0 ? 'No cities available. Add cities first.' : '')}
                         >
                             {cities?.map((city) => (
-                                <MenuItem key={city.id} value={city.code}>
+                                <MenuItem key={city.cityId} value={city.code}>
                                     {city.name} ({city.code})
                                 </MenuItem>
                             ))}

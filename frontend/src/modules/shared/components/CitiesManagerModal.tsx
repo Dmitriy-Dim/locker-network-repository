@@ -60,7 +60,7 @@ export function CitiesManagerModal({ isOpen, onClose }: CitiesManagerModalProps)
     };
 
     const handleEditClick = (city: City) => {
-        setEditingId(city.id);
+        setEditingId(city.cityId);
         setCode(city.code);
         setName(city.name);
         setError(null);
@@ -167,7 +167,7 @@ export function CitiesManagerModal({ isOpen, onClose }: CitiesManagerModalProps)
                     <List disablePadding>
                         {cities.map((city) => (
                             <ListItem
-                                key={city.id}
+                                key={city.cityId}
                                 sx={{
                                     px: 2,
                                     py: 1.5,
@@ -209,7 +209,7 @@ export function CitiesManagerModal({ isOpen, onClose }: CitiesManagerModalProps)
                                     </IconButton>
                                     <IconButton
                                         size="small"
-                                        onClick={() => handleDeleteClick(city.id)}
+                                        onClick={() => handleDeleteClick(city.cityId)}
                                         color="error"
                                     >
                                         <DeleteIcon fontSize="small" />
