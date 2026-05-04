@@ -45,6 +45,8 @@ type AuditAction =
     | 'CITY_DELETE_FAILED'
     | 'CITY_UPDATE'
     | 'CITY_UPDATE_FAILED'
+    | "CITY_RESTORE"
+    | "CITY_RESTORE_FAILED"
     | 'PRICE_CREATE'
     | 'PRICE_CREATE_FAILED'
     | 'PRICE_UPDATE'
