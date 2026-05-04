@@ -329,6 +329,14 @@ export class CitiesServiceImplPostgres {
             }
         );
     }
+
+    async getSoftDeletedCities(req: Request, res: Response) {
+        return Promise.resolve(undefined);
+    }
+
+    async restoreSoftDeletedCities(req: Request, res: Response) {
+        return Promise.resolve(undefined);
+    }
 }
 
 export const citiesService = new CitiesServiceImplPostgres();

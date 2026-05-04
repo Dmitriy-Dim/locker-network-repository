@@ -33,3 +33,19 @@ export const updateCities = async (req: Request, res: Response, next: NextFuncti
         next(e);
     }
 }
+
+export const getSoftDeletedCities = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await citiesService.getSoftDeletedCities(req,res);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const restoreSoftDeletedCities = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await citiesService.restoreSoftDeletedCities(req,res);
+    } catch (e) {
+        next(e);
+    }
+};
