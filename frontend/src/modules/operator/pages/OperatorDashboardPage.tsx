@@ -1,72 +1,88 @@
 import {
-    Box, Typography, Paper, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, Button
+    Box,
+    Typography,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Select,
+    MenuItem,
+    Button
 } from "@mui/material";
+
 import { useNavigate } from "react-router-dom";
 import { useStations } from "../../../hooks/useStations";
 
 export default function OperatorDashboardPage() {
     const navigate = useNavigate();
+    const { operatorStations, changeStationStatusOperator } = useStations();
 
-    const {
-        stations,
-        isLoading
-    } = useStations(); // ✅ теперь сам выберет operator endpoint
-
-    if (isLoading) return <Typography>Loading...</Typography>;
+    const handleChange = (id: string, status: "ACTIVE" | "MAINTENANCE") => {
+        changeStationStatusOperator({ id, status });
+    };
 
     return (
-        <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
-            <Typography variant="h4" mb={3}>
+        <Box sx={{ maxWidth: '1100px', mx: 'auto', mt: 4 }}>
+            <Typography variant="h4" fontWeight={900} textAlign="center" mb={4}>
                 Operator Dashboard
             </Typography>
 
-            <Paper sx={{ p: 3 }}>
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>City</TableCell>
-                                <TableCell>Address</TableCell>
-                                <TableCell align="right">Actions</TableCell>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>City</TableCell>
+                            <TableCell>Address</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell align="right">Manage</TableCell>
+                        </TableRow>
+                    </TableHead>
+
+                    <TableBody>
+                        {operatorStations.map((s) => (
+                            <TableRow key={s.stationId}>
+                                <TableCell>
+                                    {typeof s.city === "string"
+                                        ? s.city
+                                        : s.city?.name}
+                                </TableCell>
+
+                                <TableCell>{s.address}</TableCell>
+
+                                <TableCell>
+                                    <Select
+                                        size="small"
+                                        value={s.status === "INACTIVE" ? "ACTIVE" : s.status}
+                                        onChange={(e) =>
+                                            handleChange(
+                                                s.stationId,
+                                                e.target.value as "ACTIVE" | "MAINTENANCE"
+                                            )
+                                        }
+                                    >
+                                        <MenuItem value="ACTIVE">ACTIVE</MenuItem>
+                                        <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
+                                    </Select>
+                                </TableCell>
+
+                                <TableCell align="right">
+                                    <Button
+                                        variant="contained"
+                                        onClick={() =>
+                                            navigate(`stations/${s.stationId}`)
+                                        }
+                                    >
+                                        Manage Lockers
+                                    </Button>
+                                </TableCell>
                             </TableRow>
-                        </TableHead>
-
-                        <TableBody>
-                            {stations.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={3} align="center">
-                                        No stations found
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                stations.map((s) => (
-                                    <TableRow key={s.stationId}>
-                                        <TableCell>
-                                            {typeof s.city === "string"
-                                                ? s.city
-                                                : s.city?.name}
-                                        </TableCell>
-
-                                        <TableCell>{s.address}</TableCell>
-
-                                        <TableCell align="right">
-                                            <Button
-                                                variant="contained"
-                                                onClick={() =>
-                                                    navigate(`stations/${s.stationId}`)
-                                                }
-                                            >
-                                                Manage Lockers
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
         </Box>
     );
 }

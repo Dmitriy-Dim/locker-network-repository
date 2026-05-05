@@ -1,12 +1,20 @@
-import { Box, Typography, Paper, Chip, Button } from "@mui/material";
+import {
+    Box,
+    Typography,
+    Paper,
+    Chip,
+    Select,
+    MenuItem,
+    FormControl
+} from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 import { useStations } from "../../../hooks/useStations";
 
 export default function OperatorStationsPage() {
     const {
-        stations,
+        operatorStations,
         isLoading,
-        changeStationStatus
+        changeStationStatusOperator
     } = useStations();
 
     if (isLoading) return <Typography>Loading...</Typography>;
@@ -18,47 +26,60 @@ export default function OperatorStationsPage() {
             </Typography>
 
             <Grid container spacing={2}>
-                {stations.map((st) => (
+                {operatorStations.map((st) => (
                     <Grid item xs={12} md={6} key={st.stationId}>
                         <Paper sx={{ p: 3 }}>
-                            <Typography>{st.address}</Typography>
 
-                            <Chip label={st.status} sx={{ mt: 1 }} />
+                            {/* City + Address */}
+                            <Typography fontWeight={700}>
+                                {typeof st.city === "string"
+                                    ? st.city
+                                    : st.city?.name}
+                            </Typography>
 
-                            <Box mt={2} display="flex" gap={1}>
+                            <Typography variant="body2" color="text.secondary">
+                                {st.address}
+                            </Typography>
 
-                                {/* ACTIVATE */}
-                                {st.status !== "ACTIVE" && (
-                                    <Button
-                                        variant="contained"
-                                        onClick={() =>
-                                            changeStationStatus?.({
+                            {/* Status chip */}
+                            <Chip
+                                label={st.status}
+                                sx={{ mt: 1 }}
+                                color={
+                                    st.status === "ACTIVE"
+                                        ? "success"
+                                        : st.status === "MAINTENANCE"
+                                            ? "error"
+                                            : "default"
+                                }
+                            />
+
+                            {/* Status selector */}
+                            <Box mt={2}>
+                                <FormControl size="small" fullWidth>
+                                    <Select
+                                        value={
+                                            st.status === "INACTIVE"
+                                                ? "ACTIVE"
+                                                : st.status
+                                        }
+                                        onChange={(e) =>
+                                            changeStationStatusOperator({
                                                 id: st.stationId,
-                                                status: "ACTIVE"
+                                                status: e.target.value as "ACTIVE" | "MAINTENANCE"
                                             })
                                         }
                                     >
-                                        Activate
-                                    </Button>
-                                )}
-
-                                {/* MAINTENANCE */}
-                                {st.status === "ACTIVE" && (
-                                    <Button
-                                        variant="contained"
-                                        color="error"
-                                        onClick={() =>
-                                            changeStationStatus?.({
-                                                id: st.stationId,
-                                                status: "MAINTENANCE"
-                                            })
-                                        }
-                                    >
-                                        Maintenance
-                                    </Button>
-                                )}
-
+                                        <MenuItem value="ACTIVE">
+                                            ACTIVE
+                                        </MenuItem>
+                                        <MenuItem value="MAINTENANCE">
+                                            MAINTENANCE
+                                        </MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Box>
+
                         </Paper>
                     </Grid>
                 ))}

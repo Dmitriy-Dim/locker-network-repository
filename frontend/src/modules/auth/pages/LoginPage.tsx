@@ -28,9 +28,7 @@ export function LoginPage() {
         setLoading(true);
 
         try {
-
             const loggedInUser = await login(email, password);
-
             const currentUser = loggedInUser || user;
 
             if (currentUser?.role === ROLES.ADMIN) {
@@ -40,12 +38,10 @@ export function LoginPage() {
             } else if (currentUser?.role === ROLES.USER) {
                 navigate(Paths.USER, { replace: true });
             } else {
-                // Fallback route if the role hasn't synced yet
                 navigate('/', { replace: true });
             }
 
         } catch (err: unknown) {
-
             if (err instanceof Error) {
                 setError(err.message);
             } else {
@@ -59,7 +55,42 @@ export function LoginPage() {
     return (
         <Box sx={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
 
-            {/* "Back to Home" Button - now inside the parent Box and styled with MUI */}
+            {/* 🔐 TEST CREDENTIALS */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    top: 20,
+                    right: 20,
+                    bgcolor: 'rgba(255,255,255,0.9)',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 2,
+                    p: 2,
+                    fontSize: '0.75rem',
+                    color: '#334155',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    backdropFilter: 'blur(6px)'
+                }}
+            >
+                <Typography fontWeight={700} mb={1}>
+                    Test Accounts
+                </Typography>
+
+                <Typography sx={{ fontFamily: 'monospace' }}>
+                    operator@gmail.com
+                </Typography>
+                <Typography sx={{ fontFamily: 'monospace', mb: 1 }}>
+                    1234Password!
+                </Typography>
+
+                <Typography sx={{ fontFamily: 'monospace' }}>
+                    admin@gmail.com
+                </Typography>
+                <Typography sx={{ fontFamily: 'monospace' }}>
+                    1234Password!
+                </Typography>
+            </Box>
+
+            {/* BACK BUTTON */}
             <Button
                 onClick={() => navigate('/')}
                 sx={{

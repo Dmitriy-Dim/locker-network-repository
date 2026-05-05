@@ -1,110 +1,77 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
-import { useAuth } from "./useAuth";
-import type { LockerStation } from "../types/index";
+import type { LockerStation, StationStatus } from "../types/index";
 
-interface CreateStationPayload {
-    city: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-}
+type OperatorStationStatus = Extract<StationStatus, "ACTIVE" | "MAINTENANCE">;
 
 export function useStations(options?: { publicOnly?: boolean; limit?: number }) {
     const qc = useQueryClient();
-    const { user } = useAuth();
-
     const isPublic = options?.publicOnly;
     const limit = options?.limit;
-    const isOperator = user?.role === "OPERATOR";
-    const isAdmin = user?.role === "ADMIN";
 
     // ===============================
-    // QUERY (роль-зависимая)
+    // QUERIES
     // ===============================
 
     const query = useQuery<LockerStation[]>({
-        queryKey: [
-            isPublic
-                ? "public-stations"
-                : isOperator
-                    ? "operator-stations"
-                    : "admin-stations",
-            limit
-        ],
-        queryFn: () => {
-            if (isPublic) return stationsApi.getActiveStations(limit);
-            if (isOperator) return stationsApi.getOperatorStations(limit);
-            return stationsApi.getAllStations(limit);
+        queryKey: ["stations", isPublic ? "active" : "all", limit],
+        queryFn: async () => {
+            return isPublic
+                ? await stationsApi.getActiveStations(limit)
+                : await stationsApi.getAllStations(limit);
         },
     });
 
-    const invalidateAll = () => {
-        qc.invalidateQueries({ queryKey: ["public-stations"] });
-        qc.invalidateQueries({ queryKey: ["operator-stations"] });
-        qc.invalidateQueries({ queryKey: ["admin-stations"] });
-        qc.invalidateQueries({ queryKey: ["station-details"] });
+    const operatorQuery = useQuery<LockerStation[]>({
+        queryKey: ["operator-stations", limit],
+        queryFn: async () => {
+            return await stationsApi.getOperatorStations(limit);
+        },
+    });
+
+    const invalidateAll = async () => {
+        await Promise.all([
+            qc.invalidateQueries({ queryKey: ["stations"] }),
+            qc.invalidateQueries({ queryKey: ["operator-stations"] }),
+            qc.invalidateQueries({ queryKey: ["operator-station"] }),
+        ]);
     };
 
     // ===============================
-    // ADMIN ACTIONS
+    // ADMIN
     // ===============================
 
     const create = useMutation({
-        mutationFn: (payload: CreateStationPayload) =>
-            stationsApi.createStation(payload),
-        onSuccess: invalidateAll,
-    });
-
-    const addLocker = useMutation({
-        mutationFn: (payload: {
-            stationId: string;
-            code: string;
-            size: "S" | "M" | "L";
-        }) => stationsApi.addLocker(payload),
-        onSuccess: invalidateAll,
-    });
-
-    // ===============================
-    // OPERATOR ACTIONS
-    // ===============================
-
-    const changeStatus = useMutation({
-        mutationFn: ({ id, status }: { id: string; status: "ACTIVE" | "MAINTENANCE" }) => {
-            if (!isOperator) {
-                throw new Error("Only operator can change station status");
-            }
-            return stationsApi.updateStationStatusOperator(id, status);
-        },
+        mutationFn: stationsApi.createStation,
         onSuccess: invalidateAll,
     });
 
     const remove = useMutation({
-        mutationFn: (id: string) => {
-            if (!isOperator) {
-                throw new Error("Only operator can delete station");
-            }
-            return stationsApi.deleteStation(id);
-        },
+        mutationFn: stationsApi.deleteStation,
         onSuccess: invalidateAll,
     });
 
     // ===============================
-    // RETURN
+    // OPERATOR
     // ===============================
+
+    const changeStatusOperator = useMutation({
+        mutationFn: ({ id, status }: { id: string; status: OperatorStationStatus }) =>
+            stationsApi.updateStationStatusOperator(id, status),
+        onSuccess: invalidateAll,
+    });
 
     return {
         stations: query.data ?? [],
-        isLoading: query.isLoading,
-        error: query.error,
+        operatorStations: operatorQuery.data ?? [],
 
-        // ADMIN
-        createStation: isAdmin ? create.mutateAsync : undefined,
-        addLocker: isAdmin ? addLocker.mutateAsync : undefined,
+        isLoading: query.isLoading || operatorQuery.isLoading,
+        error: query.error || operatorQuery.error,
 
-        // OPERATOR
-        changeStationStatus: isOperator ? changeStatus.mutateAsync : undefined,
-        deleteStation: isOperator ? remove.mutateAsync : undefined,
+        createStation: create.mutateAsync,
+        deleteStation: remove.mutateAsync,
+
+        changeStationStatusOperator: changeStatusOperator.mutateAsync,
 
         refresh: invalidateAll,
     };

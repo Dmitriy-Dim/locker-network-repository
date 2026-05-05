@@ -11,7 +11,8 @@ import {
     Chip,
     Select,
     MenuItem,
-    FormControl
+    FormControl,
+    Stack
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
@@ -44,9 +45,28 @@ export default function OperatorStationDetailsPage() {
         });
     };
 
+    const cityName =
+        typeof station?.city === "string"
+            ? station.city
+            : station?.city?.name ?? "Unknown city";
+
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4">Station Details</Typography>
+
+            {/* 🔥 HEADER СТАНЦИИ */}
+            <Stack spacing={0.5} mb={3}>
+                <Typography variant="h4" fontWeight={800}>
+                    Station Details
+                </Typography>
+
+                <Typography variant="subtitle1" color="text.secondary">
+                    {cityName}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                    {station?.address}
+                </Typography>
+            </Stack>
 
             <Grid container spacing={2}>
                 {lockers.map((locker) => (
