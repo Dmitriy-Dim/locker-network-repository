@@ -42,7 +42,6 @@ lockersRoutes.post('/admin/boxes/:id/hard-resync-cache', authorize(Role.ADMIN), 
 lockersRoutes.get('/admin/stations', authorize(Role.ADMIN), lockerStationController.getAllStation);
 lockersRoutes.get('/admin/stations/:id', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
 lockersRoutes.post('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createStationSchema), lockerStationController.createStation);
-lockersRoutes.patch('/admin/stations/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
 lockersRoutes.post('/admin/stations/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.resyncStationCache);
 lockersRoutes.post('/admin/stations/:id/hard-resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.hardRefreshStationCache);
 lockersRoutes.post('/admin/cache/reconcile', authorize(Role.ADMIN), lockerStationController.reconcileCatalogCache);
@@ -52,6 +51,7 @@ lockersRoutes.post('/admin/cache/hard-refresh', authorize(Role.ADMIN), lockerSta
 // operator-only routes
 lockersRoutes.get('/oper/stations', authorize(Role.OPERATOR), lockerStationController.getAllStation);
 lockersRoutes.get('/oper/stations/:id', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
+lockersRoutes.patch('/oper/stations/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
 lockersRoutes.patch('/oper/boxes/:id/tech-status', authorize(Role.OPERATOR), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.patch('/oper/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
 lockersRoutes.patch('/oper/stations/:id/delete', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.deleteStation);
