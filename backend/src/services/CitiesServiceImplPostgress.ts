@@ -383,7 +383,7 @@ export class CitiesServiceImplPostgres {
                             throw new HttpError(404, "City not found");
                         }
 
-                        if (cityExist.isActive === true) {
+                        if (cityExist.isActive) {
                             return { city: cityExist };
                         }
 
