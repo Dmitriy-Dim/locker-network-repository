@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { devicesApi } from '../api/devicesApi';
+import { devicesApi, type UserDevicePayload } from '../api/devicesApi';
 
 export function useLockerOperation() {
     const qc = useQueryClient();
@@ -20,13 +20,13 @@ export function useLockerOperation() {
     });
 
     const openLocker = useMutation({
-        mutationFn: (bookingId: string) => devicesApi.openLockerUser(bookingId),
+        mutationFn: (payload: UserDevicePayload) => devicesApi.openLockerUser(payload),
         onSuccess: (data) => setOperationId(data.operationId),
         onError: (error) => console.error("Error starting open operation:", error)
     });
 
     const closeLocker = useMutation({
-        mutationFn: (bookingId: string) => devicesApi.closeLockerUser(bookingId),
+        mutationFn: (payload: UserDevicePayload) => devicesApi.closeLockerUser(payload),
         onSuccess: (data) => setOperationId(data.operationId),
         onError: (error) => console.error("Error starting close operation:", error)
     });

@@ -18,7 +18,7 @@ import { useStations } from "../../../hooks/useStations";
 
 export default function OperatorDashboardPage() {
     const navigate = useNavigate();
-    const { operatorStations, changeStationStatusOperator } = useStations();
+    const { stations:operatorStations, changeStationStatusOperator } = useStations();
 
     const handleChange = (id: string, status: "ACTIVE" | "MAINTENANCE") => {
         changeStationStatusOperator({ id, status });

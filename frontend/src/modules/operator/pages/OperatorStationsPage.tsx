@@ -12,7 +12,7 @@ import { useStations } from "../../../hooks/useStations";
 
 export default function OperatorStationsPage() {
     const {
-        operatorStations,
+        stations:operatorStations,
         isLoading,
         changeStationStatusOperator
     } = useStations();

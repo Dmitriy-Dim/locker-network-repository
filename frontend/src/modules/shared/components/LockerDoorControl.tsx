@@ -5,10 +5,11 @@ import { useLockerOperation } from '../../../hooks/useLockerOperation';
 interface LockerDoorControlProps {
     bookingId: string;
     lockerBoxId: string;
+    stationId: string;
     onChangeLockerRequest: () => void;
 }
 
-export function LockerDoorControl({ bookingId, lockerBoxId, onChangeLockerRequest }: LockerDoorControlProps) {
+export function LockerDoorControl({ bookingId, lockerBoxId, stationId, onChangeLockerRequest }: LockerDoorControlProps) {
     const qc = useQueryClient();
     const {
         openLocker,
@@ -66,7 +67,10 @@ export function LockerDoorControl({ bookingId, lockerBoxId, onChangeLockerReques
             <div className="flex gap-4">
                 {!isWorking && !canShowCloseButton && !isSuccessfullyClosed && (
                     <button
-                        onClick={() => openLocker(bookingId)}
+                        onClick={() => openLocker({
+                            bookingId: bookingId,
+                            stationId: stationId,
+                            lockerBoxId: lockerBoxId})}
                         className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors"
                     >
                         Open locker
@@ -75,7 +79,13 @@ export function LockerDoorControl({ bookingId, lockerBoxId, onChangeLockerReques
 
                 {canShowCloseButton && (
                     <button
-                        onClick={() => closeLocker(bookingId)}
+                        onClick={() => closeLocker(
+                            {
+                                bookingId: bookingId,
+                                stationId: stationId,
+                                lockerBoxId: lockerBoxId
+                            }
+                        )}
                         disabled={isWorking}
                         className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
