@@ -207,10 +207,11 @@ export function AdminDashboardPage() {
                 </DialogActions>
             </Dialog>
 
-            <CitiesManagerModal
+            {(citiesModalOpen && <CitiesManagerModal
                 isOpen={citiesModalOpen}
                 onClose={() => setCitiesModalOpen(false)}
             />
+                )}
         </Box>
     );
 }

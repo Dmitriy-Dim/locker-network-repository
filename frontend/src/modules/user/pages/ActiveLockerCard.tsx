@@ -126,11 +126,25 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     };
 
     const toggleLockerDevice = async () => {
+
+        if (!bookingId || !stationId || !lockerBoxId) {
+            console.error("Missing required IDs for device operation", { bookingId, stationId, lockerBoxId });
+            alert("System error: Missing station or locker information.");
+            return;
+        }
+
+
+        const devicePayload = {
+            bookingId: bookingId,
+            stationId: stationId,
+            lockerBoxId: lockerBoxId
+        };
+
         try {
             if (isLockerOpen) {
-                await closeLocker(bookingId);
+                await closeLocker(devicePayload);
             } else {
-                await openLocker(bookingId);
+                await openLocker(devicePayload);
             }
         } catch (error) {
             console.error("Device error:", error);

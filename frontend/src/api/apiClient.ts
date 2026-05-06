@@ -63,7 +63,7 @@ apiClient.interceptors.response.use(
         }
 
         if (
-            (error.response?.status === 401 || error.response?.status === 403) &&
+            (error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 400) &&
             originalRequest?.url?.includes("/auth/refresh")
         ) {
             isRefreshing = false;

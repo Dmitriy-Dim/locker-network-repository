@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { devicesApi, type DeviceOperationData } from '../api/devicesApi';
+import { devicesApi, type DeviceOperationData, type UserDevicePayload } from '../api/devicesApi';
 
 type Role = 'user' | 'operator';
 
@@ -10,22 +10,25 @@ export function useDeviceOperation(role: Role = 'user') {
     const [lockerOpenState, setLockerOpenState] = useState(false);
     const processedOpsRef = useRef<Set<string>>(new Set());
 
+
     const openFn =
         role === 'operator'
-            ? (bookingId: string) =>
-                devicesApi.openLockerOperator({ mode: 'SINGLE', lockerBoxIds: [bookingId], reason: 'operator action' })
+            ? (params: UserDevicePayload) =>
+                devicesApi.openLockerOperator({ mode: 'SINGLE', lockerBoxIds: [params.lockerBoxId], reason: 'operator action' })
             : devicesApi.openLockerUser;
 
     const closeFn =
-        role === 'operator' ? devicesApi.closeLockerOperator : devicesApi.closeLockerUser;
+        role === 'operator'
+            ? (params: UserDevicePayload) => devicesApi.closeLockerOperator(params.lockerBoxId)
+            : devicesApi.closeLockerUser;
 
     const openMutation = useMutation({
-        mutationFn: (bookingId: string) => openFn(bookingId),
+        mutationFn: (params: UserDevicePayload) => openFn(params),
         onSuccess: (data) => setOperationId(data.operationId),
     });
 
     const closeMutation = useMutation({
-        mutationFn: (bookingIdOrLockerBoxId: string) => closeFn(bookingIdOrLockerBoxId),
+        mutationFn: (params: UserDevicePayload) => closeFn(params),
         onSuccess: (data) => setOperationId(data.operationId),
     });
 
@@ -34,46 +37,52 @@ export function useDeviceOperation(role: Role = 'user') {
         onSuccess: (data) => setOperationId(data.operationId),
     });
 
+
     const { data: operationData, error: pollError } = useQuery<DeviceOperationData>({
         queryKey: ['device-operation', operationId],
         queryFn: () => devicesApi.getOperationStatus(operationId!),
         enabled: !!operationId,
-        refetchInterval: (query) => {
-            const status = query.state.data?.status;
+        refetchInterval: (query: any) => {
+            const data = query?.state?.data || query;
+            const status = data?.status;
             if (status === 'SUCCESS' || status === 'FAILED') return false;
-            return 2000;
-        },
-        select: (data) => {
-
-            if (data.status === 'SUCCESS' && !processedOpsRef.current.has(data.operationId)) {
-                processedOpsRef.current.add(data.operationId);
-
-                if (data.type === 'LOCKER_OPEN' || data.type === 'LOCKER_OPEN_BATCH') {
-                    setLockerOpenState(true);
-                } else if (data.type === 'LOCKER_CLOSE') {
-                    setLockerOpenState(false);
-                } else if (data.type === 'BOOKING_CANCEL') {
-                    queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
-                }
-            }
-            return data;
+            return 1500;
         },
     });
+
+
+    useEffect(() => {
+        if (operationData?.status === 'SUCCESS' && !processedOpsRef.current.has(operationData.operationId)) {
+            processedOpsRef.current.add(operationData.operationId);
+
+            if (operationData.type === 'LOCKER_OPEN' || operationData.type === 'LOCKER_OPEN_BATCH') {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setLockerOpenState(true);
+            } else if (operationData.type === 'LOCKER_CLOSE') {
+                setLockerOpenState(false);
+            } else if (operationData.type === 'BOOKING_CANCEL') {
+                queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+            }
+        }
+    }, [operationData, queryClient]);
 
     const resetOperation = () => {
         setOperationId(null);
     };
 
+    const isQueryStarting = !!operationId && !operationData;
+
     const isWorking =
         openMutation.isPending ||
         closeMutation.isPending ||
         cancelMutation.isPending ||
+        isQueryStarting ||
         (!!operationData && (operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
 
     const isCancelling =
         cancelMutation.isPending ||
         (operationData?.type === 'BOOKING_CANCEL' &&
-            (operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
+            (isQueryStarting || operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
 
     return {
         openLocker: openMutation.mutateAsync,

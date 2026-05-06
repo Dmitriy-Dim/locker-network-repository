@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
+import { useAuth } from "./useAuth";
 import type { LockerStation, StationStatus } from "../types/index";
 
-// 🔒 оператор НЕ может ставить INACTIVE
 type OperatorStationStatus = Extract<StationStatus, "ACTIVE" | "MAINTENANCE">;
 
 interface ChangeStationStatusPayload {
@@ -19,28 +19,28 @@ interface CreateStationPayload {
 
 export function useStations(options?: { publicOnly?: boolean; limit?: number }) {
     const qc = useQueryClient();
+    const { user } = useAuth();
+
     const isPublic = options?.publicOnly;
     const limit = options?.limit;
+    const role = user?.role;
 
     // ===============================
     // QUERIES
     // ===============================
 
-    const query = useQuery<LockerStation[]>({
-        queryKey: ["stations", isPublic ? "active" : "all", limit],
-        queryFn: async () => {
-            return isPublic
-                ? await stationsApi.getActiveStations(limit)
-                : await stationsApi.getAllStations(limit);
-        },
-    });
 
-    const operatorQuery = useQuery<LockerStation[]>({
-        queryKey: ["operator-stations", limit],
+    const query = useQuery<LockerStation[]>({
+        queryKey: ["stations", isPublic ? "public" : role, limit],
         queryFn: async () => {
-            return await stationsApi.getOperatorStations(limit);
+            if (isPublic) return await stationsApi.getActiveStations(limit);
+            if (role === "OPERATOR") return await stationsApi.getOperatorStations(limit);
+            if (role === "ADMIN") return await stationsApi.getAllStations(limit);
+            return [];
         },
-        enabled: !isPublic
+
+        enabled: isPublic ? true : !!role,
+        retry: false
     });
 
     // ===============================
@@ -50,19 +50,16 @@ export function useStations(options?: { publicOnly?: boolean; limit?: number }) 
     const invalidateAll = async () => {
         await Promise.all([
             qc.invalidateQueries({ queryKey: ["stations"] }),
-            qc.invalidateQueries({ queryKey: ["operator-stations"] }),
-            qc.invalidateQueries({ queryKey: ["operator-station"] }),
             qc.invalidateQueries({ queryKey: ["station-details"] }),
         ]);
     };
 
     // ===============================
-    // ADMIN
+    // MUTATIONS
     // ===============================
 
     const create = useMutation({
-        mutationFn: (payload: CreateStationPayload) =>
-            stationsApi.createStation(payload),
+        mutationFn: (payload: CreateStationPayload) => stationsApi.createStation(payload),
         onSuccess: invalidateAll,
     });
 
@@ -71,7 +68,6 @@ export function useStations(options?: { publicOnly?: boolean; limit?: number }) 
         onSuccess: invalidateAll,
     });
 
-    // ⚠️ legacy (не удаляем — используется в админке)
     const changeStatus = useMutation({
         mutationFn: ({ id, status }: ChangeStationStatusPayload) =>
             stationsApi.updateStationStatusAdmin(
@@ -81,10 +77,6 @@ export function useStations(options?: { publicOnly?: boolean; limit?: number }) 
         onSuccess: invalidateAll,
     });
 
-    // ===============================
-    // OPERATOR
-    // ===============================
-
     const changeStatusOperator = useMutation({
         mutationFn: ({ id, status }: { id: string; status: OperatorStationStatus }) =>
             stationsApi.updateStationStatusOperator(id, status),
@@ -92,26 +84,20 @@ export function useStations(options?: { publicOnly?: boolean; limit?: number }) 
     });
 
     // ===============================
-    // RETURN (НЕ ЛОМАЕМ API)
+    // RETURN
     // ===============================
 
     return {
-        // 🔹 базовые данные (используются везде)
+
         stations: query.data ?? [],
-        operatorStations: operatorQuery.data ?? [],
+        isLoading: query.isLoading,
+        error: query.error,
 
-        isLoading: query.isLoading || operatorQuery.isLoading,
-        error: query.error || operatorQuery.error,
-
-        // 🔹 ADMIN
         createStation: create.mutateAsync,
         deleteStation: remove.mutateAsync,
-        changeStationStatus: changeStatus.mutateAsync, // legacy
-
-        // 🔹 OPERATOR
+        changeStationStatus: changeStatus.mutateAsync,
         changeStationStatusOperator: changeStatusOperator.mutateAsync,
 
-        // 🔹 сервис
         refresh: invalidateAll,
     };
 }

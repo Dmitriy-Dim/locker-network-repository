@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Box, Typography, Button, IconButton, TextField, Stack,
-    Paper, List, ListItem, Alert, CircularProgress, Divider
+    Paper, List, ListItem, Alert, CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
@@ -85,17 +85,20 @@ export function CitiesManagerModal({ isOpen, onClose }: CitiesManagerModalProps)
                 </IconButton>
             </DialogTitle>
 
-            <DialogContent dividers>
+            <DialogContent dividers sx={{ p: 0, position: 'relative' }}>
                 <Paper
                     elevation={0}
                     component="form"
                     onSubmit={handleSubmit}
                     sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10,
                         p: 2.5,
-                        mb: 3,
-                        borderRadius: 3,
-                        border: '1px solid #e2e8f0',
-                        bgcolor: '#f8fafc'
+                        borderRadius: 0,
+                        borderBottom: '1px solid #e2e8f0',
+                        bgcolor: '#f8fafc',
+                        boxShadow: '0 4px 10px -4px rgba(0,0,0,0.05)'
                     }}
                 >
                     <Typography variant="subtitle1" fontWeight={700} mb={2}>
@@ -149,76 +152,77 @@ export function CitiesManagerModal({ isOpen, onClose }: CitiesManagerModalProps)
                     </Stack>
                 </Paper>
 
-                <Divider sx={{ mb: 2 }} />
 
-                <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-                    Existing cities
-                </Typography>
-
-                {isLoading ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={28} sx={{ color: '#6baf5c' }} />
-                    </Box>
-                ) : !cities || cities.length === 0 ? (
-                    <Typography color="text.secondary" fontStyle="italic" textAlign="center" py={3}>
-                        No cities yet.
+                <Box sx={{ p: 2.5 }}>
+                    <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
+                        Existing cities
                     </Typography>
-                ) : (
-                    <List disablePadding>
-                        {cities.map((city) => (
-                            <ListItem
-                                key={city.cityId}
-                                sx={{
-                                    px: 2,
-                                    py: 1.5,
-                                    mb: 1,
-                                    borderRadius: 2,
-                                    border: '1px solid #e2e8f0',
-                                    bgcolor: '#fff',
-                                    '&:hover': { bgcolor: '#f8fafc' },
-                                    display: 'flex',
-                                    justifyContent: 'space-between'
-                                }}
-                            >
-                                <Box display="flex" alignItems="center" gap={1.5}>
-                                    <Typography
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: '#6baf5c',
-                                            bgcolor: 'rgba(107,175,92,0.1)',
-                                            px: 1,
-                                            py: 0.25,
-                                            borderRadius: 1,
-                                            fontSize: '0.8rem',
-                                            minWidth: 50,
-                                            textAlign: 'center'
-                                        }}
-                                    >
-                                        {city.code}
-                                    </Typography>
-                                    <Typography fontWeight={500}>{city.name}</Typography>
-                                </Box>
 
-                                <Box>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleEditClick(city)}
-                                        sx={{ color: '#6baf5c' }}
-                                    >
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleDeleteClick(city.cityId)}
-                                        color="error"
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Box>
-                            </ListItem>
-                        ))}
-                    </List>
-                )}
+                    {isLoading ? (
+                        <Box display="flex" justifyContent="center" py={4}>
+                            <CircularProgress size={28} sx={{ color: '#6baf5c' }} />
+                        </Box>
+                    ) : !cities || cities.length === 0 ? (
+                        <Typography color="text.secondary" fontStyle="italic" textAlign="center" py={3}>
+                            No cities yet.
+                        </Typography>
+                    ) : (
+                        <List disablePadding>
+                            {cities.map((city) => (
+                                <ListItem
+                                    key={city.cityId}
+                                    sx={{
+                                        px: 2,
+                                        py: 1.5,
+                                        mb: 1,
+                                        borderRadius: 2,
+                                        border: '1px solid #e2e8f0',
+                                        bgcolor: '#fff',
+                                        '&:hover': { bgcolor: '#f8fafc' },
+                                        display: 'flex',
+                                        justifyContent: 'space-between'
+                                    }}
+                                >
+                                    <Box display="flex" alignItems="center" gap={1.5}>
+                                        <Typography
+                                            sx={{
+                                                fontWeight: 700,
+                                                color: '#6baf5c',
+                                                bgcolor: 'rgba(107,175,92,0.1)',
+                                                px: 1,
+                                                py: 0.25,
+                                                borderRadius: 1,
+                                                fontSize: '0.8rem',
+                                                minWidth: 50,
+                                                textAlign: 'center'
+                                            }}
+                                        >
+                                            {city.code}
+                                        </Typography>
+                                        <Typography fontWeight={500}>{city.name}</Typography>
+                                    </Box>
+
+                                    <Box>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleEditClick(city)}
+                                            sx={{ color: '#6baf5c' }}
+                                        >
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleDeleteClick(city.cityId)}
+                                            color="error"
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Box>
+                                </ListItem>
+                            ))}
+                        </List>
+                    )}
+                </Box>
             </DialogContent>
 
             <DialogActions sx={{ p: 2.5 }}>

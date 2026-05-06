@@ -33,14 +33,22 @@ export interface DeviceOperationResponse {
     data: DeviceOperationData;
 }
 
+
+export interface UserDevicePayload {
+    bookingId: string;
+    stationId: string;
+    lockerBoxId: string;
+}
+
 export const devicesApi = {
-    openLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', { bookingId });
+
+    openLockerUser: async (payload: UserDevicePayload): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', payload);
         return data.data;
     },
 
-    closeLockerUser: async (bookingId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', { bookingId });
+    closeLockerUser: async (payload: UserDevicePayload): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/close-locker', payload);
         return data.data;
     },
 
