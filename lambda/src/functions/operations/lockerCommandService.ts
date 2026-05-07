@@ -1,6 +1,6 @@
 import { LockerCommand, LockerBatchCommand, OperationType, OperationStatus } from '../../types/contracts/OperationContracts';
 import { LockerErrorCode, LockStatus, DoorStatus } from '../../types/contracts/LockerContracts';
-import { updateOperationWithResult, getLockerDeviceState, updateLockerDeviceState } from '../../db/dynamodb';
+import { updateOperationWithResult, getLockerDeviceState, updateLockerDeviceState, getBooking } from '../../db/dynamodb';
 import { simulateDeviceCommand } from './lockerDeviceSimulator';
 
 const MAX_ATTEMPTS = 3;
@@ -101,6 +101,27 @@ export const handleLockerOpen = async (command: LockerCommand): Promise<void> =>
   console.log(JSON.stringify({ action: 'LOCKER_OPEN_START', operationId, lockerBoxId, bookingId, userId }));
 
   try {
+    const booking = await getBooking(bookingId);
+
+    if (!booking) {
+      await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+        errorCode: LockerErrorCode.BOOKING_NOT_FOUND,
+        errorMessage: 'Booking not found',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    if (booking.status !== 'ACTIVE' || new Date() > new Date(booking.expectedEndTime)) {
+      await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+        errorCode: LockerErrorCode.BOOKING_EXPIRED,
+        errorMessage: 'Booking has expired',
+        timestamp: new Date().toISOString(),
+      });
+      console.log(JSON.stringify({ action: 'LOCKER_OPEN_BOOKING_EXPIRED', operationId, bookingId, status: booking.status, expectedEndTime: booking.expectedEndTime }));
+      return;
+    }
+
     const deviceState = await getLockerDeviceState(lockerBoxId);
 
     if (!deviceState || deviceState.lockStatus !== 'LOCKED' || deviceState.doorStatus !== 'CLOSED') {

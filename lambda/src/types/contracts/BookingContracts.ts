@@ -33,6 +33,16 @@ export interface PaymentConfirmResult {
   currency: string;
 }
  
+// ─── BOOKING_CANCEL: SQS command from backend ───
+export interface BookingCancelCommand {
+  type: 'BOOKING_CANCEL';
+  operationId: string;
+  payload: {
+    bookingId: string;
+    actorId: string;
+  };
+}
+
 // ─── BOOKING_EXTEND: SQS command from backend ───
 export interface BookingExtendCommand {
   type: 'BOOKING_EXTEND';
@@ -41,6 +51,34 @@ export interface BookingExtendCommand {
     bookingId: string;
     userId: string;
     expectedEndTime: string;
+  };
+}
+
+// ─── BOOKING_EXTEND_CONFIRM: SQS command from backend after Stripe webhook ───
+export interface BookingExtendConfirmCommand {
+  type: 'BOOKING_EXTEND_CONFIRM';
+  operationId: string;
+  payload: {
+    bookingId: string;
+    userId: string;
+    expectedEndTime: string;
+    paymentSessionId: string;
+    providerPaymentId: string;
+    amount: number;
+    currency: string;
+  };
+}
+
+// ─── Operation result for BOOKING_EXTEND ───
+export interface BookingExtendResult {
+  bookingStatus: string;
+  pendingExtendEndTime: string;
+  extendAmount: number;
+  currency: string;
+  payment: {
+    provider: string;
+    paymentSessionId: string;
+    paymentUrl: string;
   };
 }
  
@@ -67,6 +105,11 @@ export interface BookingRecord {
   paymentConfirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  pendingExtendEndTime?: string;
+  extendPaymentSessionId?: string;
+  extendPaymentUrl?: string;
+  extendAmount?: number;
+  extendPaymentConfirmedAt?: string | null;
 }
  
 // ─── Operation result for BOOKING_INIT ───

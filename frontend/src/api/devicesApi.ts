@@ -22,6 +22,13 @@ export interface DeviceOperationData {
         opened?: any[];
         failed?: any[];
     };
+
+    payment?: {
+        provider?: string;
+        paymentSessionId?: string;
+        paymentIntentId?: string;
+        paymentUrl?: string;
+    };
     errorCode?: string;
     errorMessage?: string;
     timestamp?: string;
@@ -33,7 +40,6 @@ export interface DeviceOperationResponse {
     data: DeviceOperationData;
 }
 
-
 export interface UserDevicePayload {
     bookingId: string;
     stationId: string;
@@ -41,7 +47,6 @@ export interface UserDevicePayload {
 }
 
 export const devicesApi = {
-
     openLockerUser: async (payload: UserDevicePayload): Promise<DeviceOperationData> => {
         const { data } = await apiClient.post<DeviceOperationResponse>('/devices/open-locker', payload);
         return data.data;
@@ -67,8 +72,15 @@ export const devicesApi = {
         return data.data;
     },
 
+    extendBooking: async (bookingId: string, expectedEndTime: string): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>(`/bookings/${bookingId}/extend`, {
+            expectedEndTime
+        });
+        return data.data;
+    },
+
     getOperationStatus: async (operationId: string): Promise<DeviceOperationData> => {
         const { data } = await apiClient.get<DeviceOperationResponse>(`/operations/${operationId}`);
         return data.data;
-    },
+    }
 };
