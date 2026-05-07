@@ -181,16 +181,16 @@ export class OperationReadService {
         });
 
         // ToDo Delete mock after correct lambda
-            const random = Math.floor(Math.random() * 10) + 1;
-            if (operation.type === OperationType.LOCKER_OPEN || operation.type === OperationType.LOCKER_CLOSE) {
-                if (random > 2){
-                    operation.status = OperationStatus.SUCCESS;
-                    operation.errorMessage = " ";
-                }
-                else {
-                    operation.errorMessage = "mock error";
-                }
-            }
+        //     const random = Math.floor(Math.random() * 10) + 1;
+        //     if (operation.type === OperationType.LOCKER_OPEN || operation.type === OperationType.LOCKER_CLOSE) {
+        //         if (random > 2){
+        //             operation.status = OperationStatus.SUCCESS;
+        //             operation.errorMessage = " ";
+        //         }
+        //         else {
+        //             operation.errorMessage = "mock error";
+        //         }
+        //     }
 
         //==========================
 
