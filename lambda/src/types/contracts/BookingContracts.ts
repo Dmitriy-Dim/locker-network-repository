@@ -33,6 +33,16 @@ export interface PaymentConfirmResult {
   currency: string;
 }
  
+// ─── BOOKING_CANCEL: SQS command from backend ───
+export interface BookingCancelCommand {
+  type: 'BOOKING_CANCEL';
+  operationId: string;
+  payload: {
+    bookingId: string;
+    actorId: string;
+  };
+}
+
 // ─── BOOKING_EXTEND: SQS command from backend ───
 export interface BookingExtendCommand {
   type: 'BOOKING_EXTEND';
