@@ -69,7 +69,7 @@ async function checkDataUserRequest(req: Request, userId: string){
         throw new HttpError(409, "Station does not match booking");
     }
 
-    //ToDo check active operations with this data
+    //ToDo check active operations with this data and check lockerBoxIdStatus
 
 }
 
