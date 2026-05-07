@@ -4,9 +4,9 @@
 
 GET /api/v1/cities/
 
-### Admin endpoints ###
+# Admin endpoints ###
 
-# Create city
+### Create city
 
 POST /api/v1/cities/
 
@@ -17,14 +17,14 @@ POST /api/v1/cities/
 }
 ```
 
-# Soft delete city 
+### Soft delete city 
 
 - DELETE /api/v1/cities/:id
 
 - Example: 
 - {{baseUrl}}/api/v1/cities/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
 
-# Edit city
+### Edit city
 
 - PATCH /api/v1/cities/:id
 
