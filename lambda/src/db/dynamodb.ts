@@ -86,7 +86,12 @@ export const upsertLockerCache = async (
  
   await docClient.send(new PutCommand({
     TableName: LOCKER_CACHE_TABLE,
-    Item: { ...payload, lockerBoxId },
+    Item: {
+      ...payload,
+      lockerBoxId,
+      lockStatus: existing.Item?.lockStatus ?? 'LOCKED',
+      doorStatus: existing.Item?.doorStatus ?? 'CLOSED',
+    },
   }));
 };
  
