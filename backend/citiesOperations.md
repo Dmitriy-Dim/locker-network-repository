@@ -1,33 +1,39 @@
-placeholder, will improve
+##### Cities operations
 
-🌚GET /api/v1/cities/
+### Public endpoints ###
 
-------------------
-create city
+GET /api/v1/cities/
 
-🌚POST /api/v1/cities/
+### Admin endpoints ###
 
-пример body:
+# Create city
+
+POST /api/v1/cities/
+
+```json
 {
 "code": "RSH",
 "name": "RoshHaNikra"
 }
+```
 
--------------------
-soft delete city
+# Soft delete city 
 
-🌚DELETE /api/v1/cities/:id
+- DELETE /api/v1/cities/:id
 
-пример ссылки: {{baseUrl}}/api/v1/cities/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
+- Example: 
+- {{baseUrl}}/api/v1/cities/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
 
--------------------
-edit city
+# Edit city
 
-🌚PATCH /api/v1/cities/:id
+- PATCH /api/v1/cities/:id
 
-пример ссылки: {{baseUrl}}/api/v1/cities/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
-пример body:
+- Example: 
+- {{baseUrl}}/api/v1/cities/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
+
+```json
 {
 "code": "HIF",
 "name": "Haifa but better"
 }
+```
