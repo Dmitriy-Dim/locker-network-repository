@@ -1,10 +1,10 @@
-##### Cities operations
+# Cities operations
 
-### Public endpoints ###
+## Public endpoints 
 
 GET /api/v1/cities/
 
-# Admin endpoints ###
+## Admin endpoints 
 
 ### Create city
 
