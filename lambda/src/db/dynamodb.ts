@@ -122,6 +122,36 @@ export const findAvailableLocker = async (stationId: string, size: string) => {
   return result.Items?.[0] || null;
 };
  
+export const getLockerCache = async (lockerBoxId: string) => {
+  const result = await docClient.send(new GetCommand({
+    TableName: LOCKER_CACHE_TABLE,
+    Key: { lockerBoxId },
+  }));
+  return result.Item || null;
+};
+
+export const updateBookingExtendPayment = async (
+  bookingId: string,
+  fields: {
+    pendingExtendEndTime: string;
+    extendPaymentSessionId: string;
+    extendPaymentUrl: string;
+    extendAmount: number;
+  },
+) => {
+  await docClient.send(new UpdateCommand({
+    TableName: BOOKING_TABLE,
+    Key: { bookingId },
+    UpdateExpression: 'SET pendingExtendEndTime = :pet, extendPaymentSessionId = :eps, extendPaymentUrl = :epu, extendAmount = :ea',
+    ExpressionAttributeValues: {
+      ':pet': fields.pendingExtendEndTime,
+      ':eps': fields.extendPaymentSessionId,
+      ':epu': fields.extendPaymentUrl,
+      ':ea': fields.extendAmount,
+    },
+  }));
+};
+
 export const getLockerDeviceState = async (
   lockerBoxId: string,
 ): Promise<{ lockStatus: LockStatus; doorStatus: DoorStatus } | null> => {
