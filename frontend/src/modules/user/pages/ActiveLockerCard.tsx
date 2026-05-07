@@ -1,16 +1,19 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Paper, Box, Typography, Stack, Chip, Button, Alert, CircularProgress } from "@mui/material";
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import LockIcon from '@mui/icons-material/Lock';
-import { useQuery, useQueryClient } from "@tanstack/react-query"; // Добавлен useQueryClient
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi.ts";
 import { lockersApi } from "../../../api/lockersApi.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
 export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
+
     const {
         openLocker,
         closeLocker,
@@ -22,7 +25,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     } = useDeviceOperation();
 
     const bookingId = booking.bookingId || booking.id;
-
+    const isStuck = operationError?.result?.nextAction === 'CHANGE_LOCKER';
 
     const [isHidden, setIsHidden] = useState(() => {
         try {
@@ -94,10 +97,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     }, [booking.expectedEndTime]);
 
     const handleCancel = async () => {
-        if (!bookingId) {
-            console.error("Missing bookingId", booking);
-            return;
-        }
+        if (!bookingId) return;
         try {
             await cancelBookingDevice(bookingId);
             queryClient.setQueryData(["my-bookings"], (oldData: any) => {
@@ -118,7 +118,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
             }
 
             setIsHidden(true);
-
         } catch (error: any) {
             console.error("Cancel failed:", error?.response?.status, error?.message);
             alert(`Could not cancel booking: ${error?.message ?? "Unknown error"}`);
@@ -126,13 +125,10 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     };
 
     const toggleLockerDevice = async () => {
-
         if (!bookingId || !stationId || !lockerBoxId) {
-            console.error("Missing required IDs for device operation", { bookingId, stationId, lockerBoxId });
             alert("System error: Missing station or locker information.");
             return;
         }
-
 
         const devicePayload = {
             bookingId: bookingId,
@@ -187,93 +183,120 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
 
                 <Stack alignItems={{ xs: 'stretch', md: 'flex-end' }} spacing={2} sx={{ minWidth: { md: '350px' } }}>
 
-                    {operationError && (
-                        <Alert severity="error" sx={{ borderRadius: 2, py: 0 }}>
-                            {operationError.errorMessage ?? "Operation failed. Please try again."}
-                        </Alert>
-                    )}
-
-                    {/* СЦЕНАРИЙ 1: БОЛЕЕ 8 ЧАСОВ */}
-                    {timerStatus === 'heavilyOverdue' && (
-                        <Alert severity="error" sx={{ borderRadius: 2 }}>
-                            <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
-                                Items moved to Lost & Found
+                    {/* 4. ЕСЛИ ЗАМОК СЛОМАН (3 ПОПЫТКИ) — ПОКАЗЫВАЕМ ТОЛЬКО ЭТОТ БЛОК */}
+                    {isStuck ? (
+                        <Box sx={{ p: 2.5, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 2, textAlign: 'center', width: '100%' }}>
+                            <Typography variant="h4" mb={1}>😕</Typography>
+                            <Typography variant="subtitle1" color="#991b1b" fontWeight={800} mb={0.5}>
+                                Oops, something went wrong!
                             </Typography>
-                            <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.4 }}>
-                                Your booking is more than 8 hours overdue. To retrieve your items, please contact support.
+                            <Typography variant="caption" color="#b91c1c" sx={{ display: 'block', mb: 2, lineHeight: 1.4 }}>
+                                We couldn't open this locker. Don't worry, we will find a more suitable locker for you.
                             </Typography>
-                        </Alert>
-                    )}
-
-                    {/* СЦЕНАРИЙ 2: ПРОСРОЧЕНО ДО 8 ЧАСОВ */}
-                    {timerStatus === 'expired' && (
-                        <>
-                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', width: '100%' }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={700}>Expired</Typography>
-                                <Typography variant="h5" fontWeight={800} color="#b45309">Overdue</Typography>
-                            </Box>
                             <Button
                                 variant="contained"
-                                color="warning"
+                                color="error"
                                 fullWidth
-                                onClick={() => alert("Redirecting to Pay Overdue Amount")}
-                                sx={{ borderRadius: 2, fontWeight: 800 }}
+                                onClick={() => {
+                                    navigate(`/stations/${stationId}`);
+                                }}
+                                sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}
                             >
-                                Pay Overdue Amount
+                                Book a new locker
                             </Button>
-                        </>
-                    )}
-
-                    {/* СЦЕНАРИЙ 3: АКТИВНАЯ БРОНЬ */}
-                    {timerStatus === 'active' && isActive && (
+                        </Box>
+                    ) : (
                         <>
-                            <Box sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: 2, textAlign: 'center', width: '100%' }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={700}>Ends in:</Typography>
-                                <Typography variant="h5" fontWeight={800} color="#166534">{timeLeft}</Typography>
-                            </Box>
+                            {/* ОБЫЧНЫЕ СЦЕНАРИИ (ЕСЛИ НЕ СЛОМАНО) */}
+                            {operationError && (
+                                <Alert severity="error" sx={{ borderRadius: 2, py: 0 }}>
+                                    {operationError.errorMessage ?? "Operation failed. Please try again."}
+                                </Alert>
+                            )}
 
-                            <Button
-                                variant="contained"
-                                color={isLockerOpen ? "warning" : "success"}
-                                onClick={toggleLockerDevice}
-                                disabled={isWorking}
-                                startIcon={isWorking
-                                    ? <CircularProgress size={20} color="inherit" />
-                                    : (isLockerOpen ? <LockIcon /> : <LockOpenIcon />)
-                                }
-                                sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none', py: 1.5, fontSize: '1.1rem', width: '100%' }}
-                            >
-                                {isWorking ? "Connecting..." : (isLockerOpen ? "Close Locker" : "Open Locker")}
-                            </Button>
+                            {/* СЦЕНАРИЙ 1: БОЛЕЕ 8 ЧАСОВ */}
+                            {timerStatus === 'heavilyOverdue' && (
+                                <Alert severity="error" sx={{ borderRadius: 2 }}>
+                                    <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
+                                        Items moved to Lost & Found
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.4 }}>
+                                        Your booking is more than 8 hours overdue. To retrieve your items, please contact support.
+                                    </Typography>
+                                </Alert>
+                            )}
 
-                            <Stack direction="row" spacing={1} sx={{ width: '100%', pointerEvents: 'none' }}>
-                                <Button
-                                    variant="contained"
-                                    onClick={() => alert("Extend Modal")}
-                                    startIcon={<AccessTimeIcon />}
-                                    sx={{
-                                        borderRadius: 2,
-                                        fontWeight: 700,
-                                        textTransform: 'none',
-                                        flex: 1,
-                                        bgcolor: '#3b82f6',
-                                        '&:hover': { bgcolor: '#2563eb' },
-                                        pointerEvents: 'auto'
-                                    }}
-                                >
-                                    Extend
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    onClick={handleCancel}
-                                    disabled={isCancelling}
-                                    startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
-                                    sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1, pointerEvents: 'auto' }}
-                                >
-                                    {isCancelling ? "Cancelling..." : "Cancel"}
-                                </Button>
-                            </Stack>
+                            {/* СЦЕНАРИЙ 2: ПРОСРОЧЕНО ДО 8 ЧАСОВ */}
+                            {timerStatus === 'expired' && (
+                                <>
+                                    <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', width: '100%' }}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={700}>Expired</Typography>
+                                        <Typography variant="h5" fontWeight={800} color="#b45309">Overdue</Typography>
+                                    </Box>
+                                    <Button
+                                        variant="contained"
+                                        color="warning"
+                                        fullWidth
+                                        onClick={() => alert("Redirecting to Pay Overdue Amount")}
+                                        sx={{ borderRadius: 2, fontWeight: 800 }}
+                                    >
+                                        Pay Overdue Amount
+                                    </Button>
+                                </>
+                            )}
+
+                            {/* СЦЕНАРИЙ 3: АКТИВНАЯ БРОНЬ */}
+                            {timerStatus === 'active' && isActive && (
+                                <>
+                                    <Box sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: 2, textAlign: 'center', width: '100%' }}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={700}>Ends in:</Typography>
+                                        <Typography variant="h5" fontWeight={800} color="#166534">{timeLeft}</Typography>
+                                    </Box>
+
+                                    <Button
+                                        variant="contained"
+                                        color={isLockerOpen ? "warning" : "success"}
+                                        onClick={toggleLockerDevice}
+                                        disabled={isWorking}
+                                        startIcon={isWorking
+                                            ? <CircularProgress size={20} color="inherit" />
+                                            : (isLockerOpen ? <LockIcon /> : <LockOpenIcon />)
+                                        }
+                                        sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none', py: 1.5, fontSize: '1.1rem', width: '100%' }}
+                                    >
+                                        {isWorking ? "Connecting..." : (isLockerOpen ? "Close Locker" : "Open Locker")}
+                                    </Button>
+
+                                    <Stack direction="row" spacing={1} sx={{ width: '100%', pointerEvents: 'none' }}>
+                                        <Button
+                                            variant="contained"
+                                            onClick={() => alert("Extend Modal")}
+                                            startIcon={<AccessTimeIcon />}
+                                            sx={{
+                                                borderRadius: 2,
+                                                fontWeight: 700,
+                                                textTransform: 'none',
+                                                flex: 1,
+                                                bgcolor: '#3b82f6',
+                                                '&:hover': { bgcolor: '#2563eb' },
+                                                pointerEvents: 'auto'
+                                            }}
+                                        >
+                                            Extend
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={handleCancel}
+                                            disabled={isCancelling}
+                                            startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
+                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1, pointerEvents: 'auto' }}
+                                        >
+                                            {isCancelling ? "Cancelling..." : "Cancel"}
+                                        </Button>
+                                    </Stack>
+                                </>
+                            )}
                         </>
                     )}
                 </Stack>
