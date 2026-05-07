@@ -43,6 +43,34 @@ export interface BookingExtendCommand {
     expectedEndTime: string;
   };
 }
+
+// ─── BOOKING_EXTEND_CONFIRM: SQS command from backend after Stripe webhook ───
+export interface BookingExtendConfirmCommand {
+  type: 'BOOKING_EXTEND_CONFIRM';
+  operationId: string;
+  payload: {
+    bookingId: string;
+    userId: string;
+    expectedEndTime: string;
+    paymentSessionId: string;
+    providerPaymentId: string;
+    amount: number;
+    currency: string;
+  };
+}
+
+// ─── Operation result for BOOKING_EXTEND ───
+export interface BookingExtendResult {
+  bookingStatus: string;
+  pendingExtendEndTime: string;
+  extendAmount: number;
+  currency: string;
+  payment: {
+    provider: string;
+    paymentSessionId: string;
+    paymentUrl: string;
+  };
+}
  
 // ─── DynamoDB booking record ───
 export interface BookingRecord {
@@ -67,6 +95,11 @@ export interface BookingRecord {
   paymentConfirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  pendingExtendEndTime?: string;
+  extendPaymentSessionId?: string;
+  extendPaymentUrl?: string;
+  extendAmount?: number;
+  extendPaymentConfirmedAt?: string | null;
 }
  
 // ─── Operation result for BOOKING_INIT ───
