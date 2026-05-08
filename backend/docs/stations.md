@@ -294,7 +294,7 @@ Responses:
 - `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
 - `500 Internal Server Error` - projection build failed or unexpected repository/service failure
 
-#### PATCH /api/v1/lockers/admin/stations/:id/status
+#### PATCH /api/v1/lockers/oper/stations/:id/status
 
 - Roles: operator, admin
 - Updates RDS first

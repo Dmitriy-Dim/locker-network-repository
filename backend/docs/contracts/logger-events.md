@@ -77,7 +77,7 @@ Example payload:
   "ipAddress": "127.0.0.1",
   "userAgent": "Mozilla/5.0",
   "method": "PATCH",
-  "path": "/api/v1/lockers/admin/stations/123/status",
+  "path": "/api/v1/lockers/oper/stations/123/status",
   "reason": "Authenticated user does not have required role",
   "details": {
     "requiredRoles": [

@@ -3,7 +3,7 @@
     "_postman_id": "9f9e1df0-3f3d-4f89-8426-a1be5b6cb9c1",
     "name": "Locker Backend Local",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Updated collection matching the routes currently mounted by the backend. Locker lifecycle uses techStatus, and DynamoDB Admin is exposed at {{dynamodbAdminUrl}}."
+    "description": "Updated collection matching the routes currently mounted by the backend. Includes auth, cities, pricing, lockers/stations, bookings, payments, and device open/close commands."
   },
   "variable": [
     {
@@ -53,6 +53,18 @@
     {
       "key": "stripeSignature",
       "value": "t=1713772800,v1=replace-with-real-signature"
+    },
+    {
+      "key": "cityId",
+      "value": ""
+    },
+    {
+      "key": "priceId",
+      "value": ""
+    },
+    {
+      "key": "clientRequestId",
+      "value": "client-req-001"
     }
   ],
   "item": [
@@ -338,6 +350,158 @@
                 "api",
                 "v1",
                 "cities"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/cities",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-city-create"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"TLV\",\n  \"name\": \"Tel Aviv\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/cities/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-city-update"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"TLV\",\n  \"name\": \"Tel Aviv Updated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities/{{cityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities",
+                "{{cityId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/v1/cities/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-city-delete"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities/{{cityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities",
+                "{{cityId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/cities/sd",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities/sd",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities",
+                "sd"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/cities/sd/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-city-restore"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities/sd/{{cityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities",
+                "sd",
+                "{{cityId}}"
               ]
             }
           }
@@ -814,7 +978,7 @@
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/stations/:id/status",
+          "name": "PATCH /api/v1/lockers/oper/stations/:id/status",
           "request": {
             "method": "PATCH",
             "header": [
@@ -836,7 +1000,7 @@
               "raw": "{\n  \"status\": \"ACTIVE\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/stations/{{stationId}}/status",
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/stations/{{stationId}}/status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -844,7 +1008,7 @@
                 "api",
                 "v1",
                 "lockers",
-                "admin",
+                "oper",
                 "stations",
                 "{{stationId}}",
                 "status"
@@ -963,6 +1127,110 @@
                 "stations",
                 "{{stationId}}",
                 "delete"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/oper/stations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/stations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "oper",
+                "stations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/oper/stations/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/stations/{{stationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "oper",
+                "stations",
+                "{{stationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/lockers/admin/boxes/:id/hard-resync-cache",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/hard-resync-cache",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "boxes",
+                "{{lockerBoxId}}",
+                "hard-resync-cache"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/lockers/admin/cache/hard-refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/cache/hard-refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "cache",
+                "hard-refresh"
               ]
             }
           }
@@ -1272,6 +1540,266 @@
                 "admin",
                 "users",
                 "{{adminUserId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pricing",
+      "item": [
+        {
+          "name": "GET /api/v1/pricing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pricing?cityId={{cityId}}&size=S",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing"
+              ],
+              "query": [
+                {
+                  "key": "cityId",
+                  "value": "{{cityId}}"
+                },
+                {
+                  "key": "size",
+                  "value": "S"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/pricing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-price-create"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cityId\": \"{{cityId}}\",\n  \"size\": \"S\",\n  \"pricePerHour\": 12.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pricing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/pricing/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-price-update"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pricePerHour\": 14\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pricing/{{priceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "{{priceId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Devices",
+      "item": [
+        {
+          "name": "POST /api/v1/devices/open-locker",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-device-open"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"stationId\": \"{{stationId}}\",\n  \"lockerBoxId\": \"{{lockerBoxId}}\",\n  \"clientRequestId\": \"{{clientRequestId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/devices/open-locker",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "devices",
+                "open-locker"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/devices/close-locker",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-device-close"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"stationId\": \"{{stationId}}\",\n  \"lockerBoxId\": \"{{lockerBoxId}}\",\n  \"clientRequestId\": \"{{clientRequestId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/devices/close-locker",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "devices",
+                "close-locker"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/devices/oper/open-locker",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-oper-open"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationId\": \"{{stationId}}\",\n  \"mode\": \"IDS\",\n  \"lockerBoxIds\": [\n    \"{{lockerBoxId}}\"\n  ],\n  \"reason\": \"MAINTENANCE\",\n  \"clientRequestId\": \"{{clientRequestId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/devices/oper/open-locker",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "devices",
+                "oper",
+                "open-locker"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/devices/oper/close-locker",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-oper-close"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationId\": \"{{stationId}}\",\n  \"mode\": \"IDS\",\n  \"lockerBoxIds\": [\n    \"{{lockerBoxId}}\"\n  ],\n  \"reason\": \"MAINTENANCE\",\n  \"clientRequestId\": \"{{clientRequestId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/devices/oper/close-locker",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "devices",
+                "oper",
+                "close-locker"
               ]
             }
           }

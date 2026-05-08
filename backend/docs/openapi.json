@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Locker Network API",
-    "version": "1.1.0",
-    "description": "Current API surface for the Locker Network backend. This spec reflects the routes mounted in `backend/src/server.ts` and the active Express routers.",
+    "version": "1.2.0",
+    "description": "Current API surface for the Locker Network backend. This spec reflects the routes mounted in backend/src/server.ts and the active Express routers, including pricing, city write routes, device commands, and operator locker routes.",
     "contact": {
       "name": "API Support",
       "email": "support@lockernetwork.com"
@@ -58,6 +58,14 @@
     {
       "name": "Admin",
       "description": "Administrative endpoints"
+    },
+    {
+      "name": "Pricing",
+      "description": "City and size pricing"
+    },
+    {
+      "name": "Devices",
+      "description": "Locker device commands through SQS/Lambda"
     }
   ],
   "components": {
@@ -371,14 +379,25 @@
             "enum": [
               "PENDING",
               "PROCESSING",
-              "COMPLETED",
+              "SUCCESS",
               "FAILED"
             ]
           },
           "type": {
             "type": "string",
             "enum": [
-              "HEALTH_CHECK"
+              "HEALTH_CHECK",
+              "SECURITY_EVENT",
+              "BOOKING_INIT",
+              "BOOKING_EXTEND",
+              "BOOKING_CANCEL",
+              "BOOKING_UPDATE_STATUS",
+              "BOOKING_EXTEND_CONFIRM",
+              "PAYMENT_CONFIRM",
+              "LOCKER_OPEN",
+              "LOCKER_CLOSE",
+              "LOCKER_OPEN_BATCH",
+              "LOCKER_CLOSE_BATCH"
             ]
           },
           "timestamp": {
@@ -779,6 +798,11 @@
                           "BOOKING_INIT",
                           "BOOKING_EXTEND"
                         ]
+                      },
+                      "operationId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Required when paymentFlow is BOOKING_EXTEND."
                       }
                     }
                   }
@@ -801,6 +825,179 @@
               "OPERATOR",
               "ADMIN"
             ]
+          }
+        }
+      },
+      "CreateCityRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "name"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 4,
+            "example": "TLV"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tel Aviv"
+          }
+        }
+      },
+      "UpdateCityRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 4,
+            "example": "JRS"
+          },
+          "name": {
+            "type": "string",
+            "example": "Jerusalem"
+          }
+        }
+      },
+      "Pricing": {
+        "type": "object",
+        "properties": {
+          "priceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          },
+          "pricePerHour": {
+            "type": "number",
+            "example": 12.5
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "city": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "CreatePricingRequest": {
+        "type": "object",
+        "required": [
+          "cityId",
+          "size",
+          "pricePerHour"
+        ],
+        "properties": {
+          "cityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          },
+          "pricePerHour": {
+            "type": "number",
+            "example": 12.5
+          }
+        }
+      },
+      "UpdatePricingRequest": {
+        "type": "object",
+        "required": [
+          "pricePerHour"
+        ],
+        "properties": {
+          "pricePerHour": {
+            "type": "number",
+            "example": 14
+          }
+        }
+      },
+      "UserDeviceCommandRequest": {
+        "type": "object",
+        "required": [
+          "bookingId",
+          "lockerBoxId",
+          "stationId"
+        ],
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lockerBoxId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientRequestId": {
+            "type": "string",
+            "example": "client-open-001"
+          }
+        }
+      },
+      "OperatorDeviceCommandRequest": {
+        "type": "object",
+        "required": [
+          "stationId",
+          "mode",
+          "reason"
+        ],
+        "properties": {
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "STATUS",
+              "IDS"
+            ],
+            "example": "IDS"
+          },
+          "lockerBoxIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/LockerStatus"
+          },
+          "reason": {
+            "type": "string",
+            "example": "MAINTENANCE"
+          },
+          "clientRequestId": {
+            "type": "string",
+            "example": "oper-open-001"
           }
         }
       }
@@ -849,103 +1046,12 @@
     }
   },
   "paths": {
-    "/health": {
-      "get": {
+    "/api/v1/admin/users/{id}": {
+      "patch": {
         "tags": [
-          "System"
+          "Admin"
         ],
-        "summary": "Health check",
-        "responses": {
-          "200": {
-            "description": "Healthy or degraded status payload",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "One or more dependencies are unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/operations/health": {
-      "post": {
-        "tags": [
-          "Operations"
-        ],
-        "summary": "Create health-check operation",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          },
-          {
-            "$ref": "#/components/parameters/CorrelationIdHeader"
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OperationCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Operation created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                },
-                "example": {
-                  "success": true,
-                  "status": "success",
-                  "correlationId": "0d9f4f8f-0f31-4f4f-a38e-dafb2cb3d12d",
-                  "data": {
-                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
-                    "status": "PENDING"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
-          }
-        }
-      }
-    },
-    "/operations/{id}": {
-      "get": {
-        "tags": [
-          "Operations"
-        ],
-        "summary": "Get operation status",
+        "summary": "Update user role",
         "security": [
           {
             "bearerAuth": []
@@ -954,14 +1060,21 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/CorrelationIdHeader"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Current operation state",
+            "description": "Role updated",
             "content": {
               "application/json": {
                 "schema": {
@@ -971,10 +1084,8 @@
                   "success": true,
                   "status": "success",
                   "data": {
-                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
-                    "status": "COMPLETED",
-                    "type": "HEALTH_CHECK",
-                    "timestamp": "2026-04-22T08:30:00.000Z"
+                    "id": "d5ca3d39-0774-4511-9353-136bc44717ee",
+                    "role": "OPERATOR"
                   }
                 }
               }
@@ -992,12 +1103,12 @@
         }
       }
     },
-    "/api/v1/auth/signup": {
+    "/api/v1/auth/google": {
       "post": {
         "tags": [
           "Auth"
         ],
-        "summary": "Register a user",
+        "summary": "Login via Google ID token",
         "parameters": [
           {
             "$ref": "#/components/parameters/CorrelationIdHeader"
@@ -1008,14 +1119,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
+                "$ref": "#/components/schemas/GoogleLoginRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Registration succeeded",
+            "description": "Authenticated session",
             "content": {
               "application/json": {
                 "schema": {
@@ -1061,75 +1172,6 @@
                 }
               }
             }
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
-          }
-        }
-      }
-    },
-    "/api/v1/auth/google": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "Login via Google ID token",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/CorrelationIdHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GoogleLoginRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Authenticated session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
-          }
-        }
-      }
-    },
-    "/api/v1/auth/refresh": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "Refresh access token from cookie",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "New access token returned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
@@ -1193,89 +1235,20 @@
         }
       }
     },
-    "/api/v1/cities": {
-      "get": {
+    "/api/v1/auth/refresh": {
+      "post": {
         "tags": [
-          "Cities"
+          "Auth"
         ],
-        "summary": "List cities",
-        "responses": {
-          "200": {
-            "description": "Available cities",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/boxes": {
-      "get": {
-        "tags": [
-          "Lockers"
-        ],
-        "summary": "List public locker boxes",
-        "parameters": [
-          {
-            "name": "stationId",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/LockerSize"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/LockerStatus"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Filtered locker list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/boxes/{id}": {
-      "get": {
-        "tags": [
-          "Lockers"
-        ],
-        "summary": "Get locker details",
+        "summary": "Refresh access token from cookie",
         "security": [
           {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
+            "cookieAuth": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Locker details",
+            "description": "New access token returned",
             "content": {
               "application/json": {
                 "schema": {
@@ -1287,150 +1260,21 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
     },
-    "/api/v1/lockers/stations": {
-      "get": {
-        "tags": [
-          "Stations"
-        ],
-        "summary": "List public locker stations",
-        "parameters": [
-          {
-            "name": "city",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lat",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lng",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "radius",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/StationStatus"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Filtered station list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/stations/{id}": {
-      "get": {
-        "tags": [
-          "Stations"
-        ],
-        "summary": "Get station details",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Station details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/boxes": {
-      "get": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "List boxes for admin/operator",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Box list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      },
+    "/api/v1/auth/signup": {
       "post": {
         "tags": [
-          "Lockers",
-          "Admin"
+          "Auth"
         ],
-        "summary": "Create a locker box",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Register a user",
         "parameters": [
           {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+            "$ref": "#/components/parameters/CorrelationIdHeader"
           }
         ],
         "requestBody": {
@@ -1438,610 +1282,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateLockerRequest"
-              },
-              "example": {
-                "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
-                "code": "A-101",
-                "size": "M"
+                "$ref": "#/components/schemas/SignupRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Locker created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                },
-                "example": {
-                  "success": true,
-                  "data": {
-                    "id": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
-                    "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
-                  },
-                  "meta": {
-                    "stationCacheStatus": "SYNCED",
-                    "lockerCacheStatus": "DEFERRED"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/boxes/{id}": {
-      "get": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Get box details for admin/operator",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Box details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/oper/boxes/{id}/tech-status": {
-      "patch": {
-        "tags": [
-          "Lockers",
-          "Operator"
-        ],
-        "summary": "Change locker technical status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeLockerTechStatusRequest"
-              },
-              "example": {
-                "techStatus": "ACTIVE"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Locker tech status changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                },
-                "examples": {
-                  "active": {
-                    "summary": "ACTIVE sets user status when null",
-                    "value": {
-                      "success": true,
-                      "data": {
-                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
-                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
-                        "code": "A-101",
-                        "size": "M",
-                        "status": "AVAILABLE",
-                        "techStatus": "ACTIVE"
-                      },
-                      "meta": {
-                        "stationCacheStatus": "SYNCED",
-                        "lockerCacheStatus": "DEFERRED"
-                      }
-                    }
-                  },
-                  "maintenance": {
-                    "summary": "Non-ACTIVE clears user status",
-                    "value": {
-                      "success": true,
-                      "data": {
-                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
-                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
-                        "code": "A-101",
-                        "size": "M",
-                        "status": null,
-                        "techStatus": "MAINTENANCE"
-                      },
-                      "meta": {
-                        "stationCacheStatus": "SYNCED",
-                        "lockerCacheStatus": "DEFERRED"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid technical status transition",
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "error": {
-                    "code": "INVALID_STATUS_TRANSITION",
-                    "message": "Cannot change from INACTIVE to ACTIVE"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/boxes/{id}/resync-cache": {
-      "post": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Resync one locker box into cache",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Cache sync queued or completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/boxes/{id}/hard-resync-cache": {
-      "post": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Hard refresh one locker box cache entry",
-        "description": "Rebuilds the locker projection from RDS and enqueues it with a forced cache version.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Cache hard refresh queued or completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations": {
-      "get": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "List stations for admin/operator",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Station list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Create station",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateStationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Station created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}": {
-      "get": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Get station details for admin/operator",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Station details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}/status": {
-      "patch": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Change station status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStationStatusRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Station status changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}/resync-cache": {
-      "post": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Resync one station into cache",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Cache sync queued or completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}/hard-resync-cache": {
-      "post": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Hard refresh one station cache entry",
-        "description": "Rebuilds the station projection from RDS, writes Redis station cache, and enqueues dependent locker projections with forced cache versions.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Cache hard refresh queued or completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/cache/reconcile": {
-      "post": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Reconcile station and locker caches",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Reconciliation applied or queued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/cache/hard-refresh": {
-      "post": {
-        "tags": [
-          "Stations",
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Hard refresh station and locker caches",
-        "description": "Clears and rebuilds all station Redis cache entries and locker DynamoDB cache entries from RDS projections.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Cache hard refresh applied or queued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/oper/boxes/{id}/delete": {
-      "patch": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Soft-delete locker box",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Locker deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/lockers/oper/stations/{id}/delete": {
-      "patch": {
-        "tags": [
-          "Stations",
-          "Admin"
-        ],
-        "summary": "Soft-delete station",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Station deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/bookings/init": {
-      "post": {
-        "tags": [
-          "Bookings"
-        ],
-        "summary": "Initialize booking",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BookingInitRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Booking init queued",
+            "description": "Registration succeeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -2050,36 +1298,8 @@
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
-    "/api/v1/bookings/my": {
-      "get": {
-        "tags": [
-          "Bookings"
-        ],
-        "summary": "List current user bookings",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Current user's bookings",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -2295,6 +1515,1732 @@
         }
       }
     },
+    "/api/v1/bookings/init": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Initialize booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingInitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Booking init queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/my": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "List current user bookings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user's bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cities": {
+      "get": {
+        "tags": [
+          "Cities"
+        ],
+        "summary": "List active cities",
+        "responses": {
+          "200": {
+            "description": "Available cities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cities",
+          "Admin"
+        ],
+        "summary": "Create or reactivate city",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "City created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cities/{id}": {
+      "patch": {
+        "tags": [
+          "Cities",
+          "Admin"
+        ],
+        "summary": "Update city",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "City updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cities",
+          "Admin"
+        ],
+        "summary": "Soft-delete city",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "City soft-deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cities/sd": {
+      "get": {
+        "tags": [
+          "Cities",
+          "Admin"
+        ],
+        "summary": "List soft-deleted cities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Soft-deleted cities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cities/sd/{id}": {
+      "patch": {
+        "tags": [
+          "Cities",
+          "Admin"
+        ],
+        "summary": "Restore soft-deleted city",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "City restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/close-locker": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Close locker for active user booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDeviceCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Close command queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/open-locker": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Open locker for active user booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDeviceCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Open command queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/oper/close-locker": {
+      "post": {
+        "tags": [
+          "Devices",
+          "Operator"
+        ],
+        "summary": "Close lockers as operator batch command",
+        "description": "Queues LOCKER_CLOSE_BATCH from backend. The Lambda consumer must support the same operation type.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDeviceCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Batch close command queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/oper/open-locker": {
+      "post": {
+        "tags": [
+          "Devices",
+          "Operator"
+        ],
+        "summary": "Open lockers as operator batch command",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDeviceCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Batch open command queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes": {
+      "get": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "List boxes for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Box list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Create a locker box",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLockerRequest"
+              },
+              "example": {
+                "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                "code": "A-101",
+                "size": "M"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locker created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                    "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
+                  },
+                  "meta": {
+                    "stationCacheStatus": "SYNCED",
+                    "lockerCacheStatus": "DEFERRED"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}": {
+      "get": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Get box details for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Box details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/hard-resync-cache": {
+      "post": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Hard refresh one locker box cache entry",
+        "description": "Rebuilds the locker projection from RDS and enqueues it with a forced cache version.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/resync-cache": {
+      "post": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Resync one locker box into cache",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache sync queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/cache/hard-refresh": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Hard refresh station and locker caches",
+        "description": "Clears and rebuilds all station Redis cache entries and locker DynamoDB cache entries from RDS projections.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh applied or queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/cache/reconcile": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Reconcile station and locker caches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reconciliation applied or queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "List stations for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Create station",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Get station details for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/hard-resync-cache": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Hard refresh one station cache entry",
+        "description": "Rebuilds the station projection from RDS, writes Redis station cache, and enqueues dependent locker projections with forced cache versions.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/resync-cache": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Resync one station into cache",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache sync queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/boxes": {
+      "get": {
+        "tags": [
+          "Lockers"
+        ],
+        "summary": "List public locker boxes",
+        "parameters": [
+          {
+            "name": "stationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LockerSize"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LockerStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered locker list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/boxes/{id}": {
+      "get": {
+        "tags": [
+          "Lockers"
+        ],
+        "summary": "Get locker details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locker details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/boxes/{id}/delete": {
+      "patch": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Soft-delete locker box",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locker deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/boxes/{id}/tech-status": {
+      "patch": {
+        "tags": [
+          "Lockers",
+          "Operator"
+        ],
+        "summary": "Change locker technical status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLockerTechStatusRequest"
+              },
+              "example": {
+                "techStatus": "ACTIVE"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locker tech status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "examples": {
+                  "active": {
+                    "summary": "ACTIVE sets user status when null",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                        "code": "A-101",
+                        "size": "M",
+                        "status": "AVAILABLE",
+                        "techStatus": "ACTIVE"
+                      },
+                      "meta": {
+                        "stationCacheStatus": "SYNCED",
+                        "lockerCacheStatus": "DEFERRED"
+                      }
+                    }
+                  },
+                  "maintenance": {
+                    "summary": "Non-ACTIVE clears user status",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                        "code": "A-101",
+                        "size": "M",
+                        "status": null,
+                        "techStatus": "MAINTENANCE"
+                      },
+                      "meta": {
+                        "stationCacheStatus": "SYNCED",
+                        "lockerCacheStatus": "DEFERRED"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid technical status transition",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "INVALID_STATUS_TRANSITION",
+                    "message": "Cannot change from INACTIVE to ACTIVE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/stations": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Operator"
+        ],
+        "summary": "List stations for operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Operator"
+        ],
+        "summary": "Get station for operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/stations/{id}/delete": {
+      "patch": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Soft-delete station",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/stations/{id}/status": {
+      "patch": {
+        "tags": [
+          "Stations",
+          "Operator"
+        ],
+        "summary": "Change station status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStationStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/stations": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "List public locker stations",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StationStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered station list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Get station details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/payments/webhook": {
       "post": {
         "tags": [
@@ -2346,12 +3292,156 @@
         }
       }
     },
-    "/api/v1/admin/users/{id}": {
-      "patch": {
+    "/api/v1/pricing": {
+      "get": {
         "tags": [
+          "Pricing"
+        ],
+        "summary": "List prices",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/LockerSize"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pricing list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pricing",
           "Admin"
         ],
-        "summary": "Update user role",
+        "summary": "Create price",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePricingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Price created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pricing/{id}": {
+      "patch": {
+        "tags": [
+          "Pricing",
+          "Admin"
+        ],
+        "summary": "Update price",
         "security": [
           {
             "bearerAuth": []
@@ -2360,6 +3450,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
           }
         ],
         "requestBody": {
@@ -2367,14 +3460,117 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+                "$ref": "#/components/schemas/UpdatePricingRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Role updated",
+            "description": "Price updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Healthy or degraded status payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more dependencies are unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/{id}": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Get operation status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current operation state",
             "content": {
               "application/json": {
                 "schema": {
@@ -2384,8 +3580,10 @@
                   "success": true,
                   "status": "success",
                   "data": {
-                    "id": "d5ca3d39-0774-4511-9353-136bc44717ee",
-                    "role": "OPERATOR"
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "COMPLETED",
+                    "type": "HEALTH_CHECK",
+                    "timestamp": "2026-04-22T08:30:00.000Z"
                   }
                 }
               }
@@ -2399,6 +3597,67 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/operations/health": {
+      "post": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Create health-check operation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "correlationId": "0d9f4f8f-0f31-4f4f-a38e-dafb2cb3d12d",
+                  "data": {
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "PENDING"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }

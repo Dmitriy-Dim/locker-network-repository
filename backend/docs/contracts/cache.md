@@ -6,7 +6,7 @@ Canonical cache details are split by concern:
 
 - role matrix and request routing: [catalog-cache-and-roles.md](./catalog-cache-and-roles.md)
 - DynamoDB locker projection contract: [locker-cache-dynamo.md](./locker-cache-dynamo.md)
-- public and admin route payloads: [lockers.md](./lockers.md), [stations.md](./stations.md)
+- public and admin route payloads: [../lockers.md](../lockers.md), [../stations.md](../stations.md)
 
 ### Core model
 
@@ -33,4 +33,4 @@ Canonical cache details are split by concern:
 
 - if the question is "which role reads from where?", use [catalog-cache-and-roles.md](./catalog-cache-and-roles.md)
 - if the question is "what exact item shape is stored in DynamoDB?", use [locker-cache-dynamo.md](./locker-cache-dynamo.md)
-- if the question is "what does a route return?", use [lockers.md](./lockers.md) or [stations.md](./stations.md)
+- if the question is "what does a route return?", use [../lockers.md](../lockers.md) or [../stations.md](../stations.md)

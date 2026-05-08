@@ -491,6 +491,8 @@ npm run build
 
 Available in development at: **http://localhost:3555/docs**
 
+The source OpenAPI document is [docs/openapi.json](./docs/openapi.json). The matching Postman collection is [postman/locker-backend.postman_collection.json](./postman/locker-backend.postman_collection.json).
+
 ### Base URL
 
 ```
@@ -506,20 +508,23 @@ http://localhost:3555/api/v1
 
 The detailed route contracts live next to the owning modules:
 
-- Authentication: [auth.md](./auth.md)
-- Lockers: [lockers.md](./lockers.md)
-- Stations: [stations.md](./stations.md)
-- Booking flow: [booking-flow-contracts.md](./booking-flow-contracts.md)
-- Cache architecture: [cache.md](./cache.md)
-- Locker cache DynamoDB contract: [locker-cache-dynamo.md](./locker-cache-dynamo.md)
-- Security event transport: [logger-contracts.md](./logger-contracts.md)
-- Security event taxonomy: [logger-events.md](./logger-events.md)
+- Authentication: [docs/auth.md](./docs/auth.md)
+- Cities: [docs/citiesOperations.md](./docs/citiesOperations.md)
+- Lockers: [docs/lockers.md](./docs/lockers.md)
+- Pricing: [docs/pricing.md](./docs/pricing.md)
+- Stations: [docs/stations.md](./docs/stations.md)
+- Booking flow: [docs/contracts/booking-flow-contracts.md](./docs/contracts/booking-flow-contracts.md)
+- Contract index: [docs/contracts/README.md](./docs/contracts/README.md)
+- Cache architecture: [docs/contracts/cache.md](./docs/contracts/cache.md)
+- Locker cache DynamoDB contract: [docs/contracts/locker-cache-dynamo.md](./docs/contracts/locker-cache-dynamo.md)
+- Security event transport: [docs/contracts/logger-contracts.md](./docs/contracts/logger-contracts.md)
+- Security event taxonomy: [docs/contracts/logger-events.md](./docs/contracts/logger-events.md)
 
 ---
 
 ## 🔑 Authentication Flow
 
-Auth contracts are maintained in [auth.md](./auth.md).
+Auth contracts are maintained in [docs/auth.md](./docs/auth.md).
 
 High-level flow:
 
@@ -632,9 +637,9 @@ If `USE_LAMBDA_HEALTH=true` and the Lambda request fails or times out, the backe
 
 Cache details are intentionally split by responsibility:
 
-- overview: [cache.md](./cache.md)
-- role matrix and read/write paths: [catalog-cache-and-roles.md](./catalog-cache-and-roles.md)
-- DynamoDB locker projection contract: [locker-cache-dynamo.md](./locker-cache-dynamo.md)
+- overview: [docs/contracts/cache.md](./docs/contracts/cache.md)
+- role matrix and read/write paths: [docs/contracts/catalog-cache-and-roles.md](./docs/contracts/catalog-cache-and-roles.md)
+- DynamoDB locker projection contract: [docs/contracts/locker-cache-dynamo.md](./docs/contracts/locker-cache-dynamo.md)
 
 Quick summary:
 
@@ -645,7 +650,7 @@ Quick summary:
 
 ## Booking Flow
 
-The canonical booking contract is [booking-flow-contracts.md](./booking-flow-contracts.md).
+The canonical booking contract is [docs/contracts/booking-flow-contracts.md](./docs/contracts/booking-flow-contracts.md).
 
 Current high-level flow:
 
