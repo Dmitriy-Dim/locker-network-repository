@@ -35,6 +35,7 @@ type StripeWebhookEvent = {
 
 type PaymentWebhookPayload = {
     bookingId: string;
+    operationId?: string;
     paymentSessionId: string;
     providerPaymentId: string;
     amount: number;
@@ -118,6 +119,7 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
     }
 
     const bookingId = object.metadata?.bookingId ?? object.client_reference_id ?? undefined;
+    const operationId = object.metadata?.operationId ?? undefined;
     const paymentSessionId = object.id ?? object.metadata?.paymentSessionId ?? undefined;
     const providerPaymentId = object.payment_intent ?? object.metadata?.providerPaymentId ?? undefined;
     const amountMinor = object.amount_total ?? object.amount_received ?? object.amount ?? undefined;
@@ -131,6 +133,7 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
 
     return {
         bookingId,
+        ...(operationId ? { operationId } : {}),
         paymentSessionId,
         providerPaymentId,
         amount: toAmountMajorUnits(amountMinor),
@@ -212,7 +215,7 @@ export class PaymentService {
 
     private async finalizeExtendPaymentInRds(stagedBooking: BookingRecordDto, paymentPayload: PaymentWebhookPayload, paidAtIso: string) {
         const paidAt = new Date(paidAtIso);
-        const nextExpectedEndTime = stagedBooking.pendingExtendExpectedEndTime;
+        const nextExpectedEndTime = stagedBooking.pendingExtendEndTime;
 
         if (!nextExpectedEndTime) {
             throw new HttpError(409, "Pending booking extension not found");
@@ -280,7 +283,7 @@ export class PaymentService {
                         amount: paymentPayload.amount,
                         currency: paymentPayload.currency,
                         paymentFlow: paymentPayload.paymentFlow,
-                        pendingExtendExpectedEndTime: nextExpectedEndTime,
+                        pendingExtendEndTime: nextExpectedEndTime,
                     },
                 },
             });
@@ -338,6 +341,10 @@ export class PaymentService {
         let operationId = stagedBooking?.operationId ?? randomUUID();
 
         if (paymentPayload.paymentFlow === "BOOKING_EXTEND") {
+            if (!paymentPayload.operationId) {
+                throw new HttpError(400, "Stripe event does not contain required booking extension operationId");
+            }
+
             if (stagedBooking.extendPaymentSessionId !== paymentPayload.paymentSessionId) {
                 throw new HttpError(409, "extend paymentSessionId does not match staged booking");
             }
@@ -347,7 +354,7 @@ export class PaymentService {
             }
 
             await this.finalizeExtendPaymentInRds(stagedBooking, paymentPayload, paymentConfirmedAt);
-            operationId = stagedBooking.extendOperationId ?? operationId;
+            operationId = paymentPayload.operationId;
 
             await sendBookingExtendConfirmToQueue({
                 operationId,
@@ -355,7 +362,7 @@ export class PaymentService {
                 payload: {
                     bookingId: paymentPayload.bookingId,
                     userId: stagedBooking.userId,
-                    expectedEndTime: stagedBooking.pendingExtendExpectedEndTime ?? stagedBooking.expectedEndTime,
+                    expectedEndTime: stagedBooking.pendingExtendEndTime ?? stagedBooking.expectedEndTime,
                     paymentSessionId: paymentPayload.paymentSessionId,
                     providerPaymentId: paymentPayload.providerPaymentId,
                     amount: paymentPayload.amount,

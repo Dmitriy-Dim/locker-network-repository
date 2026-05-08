@@ -26,8 +26,7 @@ export type BookingRecordDto = {
     paymentUrl?: string;
     amount?: number;
     paymentConfirmedAt?: string;
-    extendOperationId?: string;
-    pendingExtendExpectedEndTime?: string;
+    pendingExtendEndTime?: string;
     extendPaymentStatus?: string;
     extendPaymentSessionId?: string;
     extendPaymentIntentId?: string;
