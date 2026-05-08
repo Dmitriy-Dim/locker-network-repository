@@ -1,5 +1,7 @@
 # Cities operations
 
+------------
+
 ## Public endpoints 
 
 GET /api/v1/cities/
