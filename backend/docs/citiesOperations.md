@@ -6,6 +6,8 @@
 
 GET /api/v1/cities/
 
+------------
+
 ## Admin endpoints 
 
 ### Create city
