@@ -5,7 +5,9 @@
 - GET /api/v1/cities/
 
 URL example:
-```{{baseUrl}}/api/v1/cities```
+```
+{{baseUrl}}/api/v1/cities
+```
 
 Response example: 
 ```json
@@ -36,7 +38,9 @@ Response example:
 - POST /api/v1/cities/
 
 URL example:
-```{{baseUrl}}/api/v1/cities```
+```
+{{baseUrl}}/api/v1/cities
+```
 
 Body example:
 ```json
@@ -65,7 +69,10 @@ Response example:
 - DELETE /api/v1/cities/:id
 
 URL example: 
-```{{baseUrl}}/api/v1/cities/1775812b-0f4b-4397-96b8-5769d2e3a5cb```
+```
+{{baseUrl}}/api/v1/cities/1775812b-0f4b-4397-96b8-5769d2e3a5cb
+```
+
 Response example:
 ```json
 {
@@ -126,7 +133,9 @@ Response example:
 - GET /api/v1/cities/sd
 
 URL example:
-```{{baseUrl}}/api/v1/cities/sd/```
+```
+{{baseUrl}}/api/v1/cities/sd/
+```
 
 Response example:
 ```json
@@ -160,7 +169,9 @@ Response example:
 - PATCH /api/v1/cities/sd/:id
 
 URL example:
-``` {{baseUrl}}/api/v1/cities/sd/c64f0c34-eb5d-4b26-8aad-30e43793a1a6```
+```
+{{baseUrl}}/api/v1/cities/sd/c64f0c34-eb5d-4b26-8aad-30e43793a1a6
+```
 
 Response example:
 ```json
