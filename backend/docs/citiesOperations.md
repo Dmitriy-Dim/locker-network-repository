@@ -2,11 +2,10 @@
 
 ## Public endpoints 
 
-GET /api/v1/cities/
+- GET /api/v1/cities/
 
-```
-{{baseUrl}}/api/v1/cities
-```
+URL example:
+```{{baseUrl}}/api/v1/cities```
 
 Response example: 
 ```json
@@ -34,7 +33,10 @@ Response example:
 
 ### Create city
 
-POST /api/v1/cities/
+- POST /api/v1/cities/
+
+URL example:
+```{{baseUrl}}/api/v1/cities```
 
 Body example:
 ```json
@@ -63,9 +65,7 @@ Response example:
 - DELETE /api/v1/cities/:id
 
 URL example: 
-```
-{{baseUrl}}/api/v1/cities/1775812b-0f4b-4397-96b8-5769d2e3a5cb
-```
+```{{baseUrl}}/api/v1/cities/1775812b-0f4b-4397-96b8-5769d2e3a5cb```
 Response example:
 ```json
 {
@@ -114,6 +114,65 @@ Response example:
             "code": "HIF",
             "name": "Haifa but better"
         }
+    },
+    "meta": {
+        "cityCacheStatus": "SYNCED"
+    }
+}
+```
+
+### View soft deleted cities
+
+- GET /api/v1/cities/sd
+
+URL example:
+```{{baseUrl}}/api/v1/cities/sd/```
+
+Response example:
+```json
+{
+    "success": true,
+    "status": "success",
+    "correlationId": "46a0d36d-b5f3-4a55-97b6-5359b0dc270b",
+    "data": [
+        {
+            "cityId": "1775812b-0f4b-4397-96b8-5769d2e3a5cb",
+            "code": "TT1",
+            "name": "TestCity",
+            "isActive": false,
+            "createdAt": "2026-05-09T20:30:35.621Z",
+            "updatedAt": "2026-05-09T20:31:44.198Z"
+        },
+        {
+            "cityId": "c64f0c34-eb5d-4b26-8aad-30e43793a1a6",
+            "code": "RSH",
+            "name": "RoshHaNikra",
+            "isActive": false,
+            "createdAt": "2026-04-30T01:26:31.977Z",
+            "updatedAt": "2026-05-02T23:30:24.178Z"
+        }
+    ]
+}
+```
+
+### Restore city from soft deleted list
+
+- PATCH /api/v1/cities/sd/:id
+
+URL example:
+``` {{baseUrl}}/api/v1/cities/sd/c64f0c34-eb5d-4b26-8aad-30e43793a1a6```
+
+Response example:
+```json
+{
+    "success": true,
+    "status": "success",
+    "correlationId": "0540d6ce-a437-478a-8a57-c36eb936f1f2",
+    "data": {
+        "id": "c64f0c34-eb5d-4b26-8aad-30e43793a1a6",
+        "code": "RSH",
+        "name": "RoshHaNikra",
+        "isActive": true
     },
     "meta": {
         "cityCacheStatus": "SYNCED"
