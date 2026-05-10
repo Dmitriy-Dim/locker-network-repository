@@ -1,4 +1,4 @@
-import { Request } from "express";
+import {Request} from "express";
 
 import {
     buildRequestAlertContext,
@@ -35,6 +35,7 @@ interface LogSecurityEventParams {
     req: Request;
     eventType: SecurityEventType;
     reason: string;
+    operationId?: string;
     actorId?: string;
     severity?: SecurityAlertSeverity;
     details?: Record<string, unknown>;
@@ -73,13 +74,14 @@ function defaultSeverity(eventType: SecurityEventType): SecurityAlertSeverity {
 }
 
 export async function logSecurityEvent({
-    req,
-    eventType,
-    reason,
-    actorId,
-    severity,
-    details,
-}: LogSecurityEventParams): Promise<void> {
+                                           req,
+                                           eventType,
+                                           reason,
+                                           actorId,
+                                           severity,
+                                           details,
+                                           operationId
+                                       }: LogSecurityEventParams): Promise<void> {
     const alertContext = buildRequestAlertContext(req);
     const alertSeverity = severity ?? defaultSeverity(eventType);
     const resolvedActorId = actorId ?? alertContext.actorId;
@@ -91,5 +93,6 @@ export async function logSecurityEvent({
         severity: alertSeverity,
         reason,
         details,
+        operationId
     });
 }

@@ -1,9 +1,9 @@
-import { randomUUID } from "crypto";
+import {randomUUID} from "crypto";
 
-import { Request } from "express";
+import {Request} from "express";
 
-import { env } from "../config/env";
-import { logger } from "../Logger/winston";
+import {env} from "../config/env";
+import {logger} from "../Logger/winston";
 
 export type SecurityAlertSeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
@@ -38,6 +38,7 @@ interface SecurityAlertParams {
     source?: string;
     actorId?: string | null;
     correlationId?: string;
+    operationId?: string;
     ipAddress?: string;
     userAgent?: string;
     method?: string;
@@ -107,18 +108,18 @@ export function buildRequestAlertContext(req: Request) {
 }
 
 export function emitSecurityAlert({
-    eventType,
-    severity,
-    reason,
-    source = "backend",
-    actorId,
-    correlationId,
-    ipAddress,
-    userAgent,
-    method,
-    path,
-    details,
-}: SecurityAlertParams) {
+                                      eventType,
+                                      severity,
+                                      reason,
+                                      source = "backend",
+                                      actorId,
+                                      correlationId, operationId,
+                                      ipAddress,
+                                      userAgent,
+                                      method,
+                                      path,
+                                      details,
+                                  }: SecurityAlertParams) {
     const payload = {
         category: "SECURITY_ALERT",
         schemaVersion: 1,
@@ -128,14 +129,15 @@ export function emitSecurityAlert({
         occurredAt: new Date().toISOString(),
         source,
         environment: env.NODE_ENV,
-        ...(actorId && { actorId }),
-        ...(correlationId && { correlationId }),
-        ...(ipAddress && { ipAddress }),
-        ...(userAgent && { userAgent }),
-        ...(method && { method }),
-        ...(path && { path }),
+        ...(actorId && {actorId}),
+        ...(correlationId && {correlationId}),
+        ...(operationId && { operationId }),
+        ...(ipAddress && {ipAddress}),
+        ...(userAgent && {userAgent}),
+        ...(method && {method}),
+        ...(path && {path}),
         reason,
-        ...(details && { details: safeDetails(details) }),
+        ...(details && {details: safeDetails(details)}),
     };
 
     logger.log(severity === "CRITICAL" || severity === "HIGH" ? "error" : "warn", "SECURITY_ALERT", payload);
@@ -143,15 +145,18 @@ export function emitSecurityAlert({
 
 export function getErrorDetails(error: unknown) {
     if (!(error instanceof Error)) {
-        return { errorMessage: "Unknown error" };
+        return {errorMessage: "Unknown error"};
     }
 
-    const knownError = error as Error & { code?: string; clientVersion?: string };
+    const knownError = error as Error & {
+        code?: string;
+        clientVersion?: string
+    };
 
     return {
         errorName: error.name,
         errorMessage: error.message,
-        ...(knownError.code && { errorCode: knownError.code }),
-        ...(knownError.clientVersion && { clientVersion: knownError.clientVersion }),
+        ...(knownError.code && {errorCode: knownError.code}),
+        ...(knownError.clientVersion && {clientVersion: knownError.clientVersion}),
     };
 }

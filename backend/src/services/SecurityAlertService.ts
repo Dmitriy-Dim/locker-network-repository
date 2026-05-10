@@ -86,15 +86,18 @@ export class SecurityAlertService {
         const correlationIdFilter = typeof req.query.correlationId === "string"
             ? `| filter correlationId = "${req.query.correlationId.replace(/"/g, '\\"')}"`
             : "";
-
+        const operationIdFilter = typeof req.query.operationId === "string"
+            ? `| filter operationId = "${req.query.operationId.replace(/"/g, '\\"')}"`
+            : "";
         const queryString = [
-            "fields @timestamp, @logGroup, @logStream, severity, eventType, source, environment, correlationId, actorId, reason, path, details",
+            "fields @timestamp, @logGroup, @logStream, severity, eventType, source, environment, correlationId, operationId, actorId, reason, path, details",
             '| filter category = "SECURITY_ALERT"',
             eventTypeFilter,
             severityFilter,
             sourceFilter,
             actorIdFilter,
             correlationIdFilter,
+            operationIdFilter,
             "| sort @timestamp desc",
             `| limit ${limit}`,
         ].filter(Boolean).join("\n");
