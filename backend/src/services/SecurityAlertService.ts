@@ -52,6 +52,75 @@ function toCloudWatchRecord(fields: ResultField[]) {
     );
 }
 
+function getAwsErrorDetails(error: unknown) {
+    if (!(error instanceof Error)) {
+        return {
+            errorName: "UnknownError",
+            errorMessage: "Unknown CloudWatch Logs error",
+        };
+    }
+
+    const awsError = error as Error & {
+        Code?: string;
+        code?: string;
+        $metadata?: {
+            httpStatusCode?: number;
+            requestId?: string;
+        };
+    };
+
+    return {
+        errorName: error.name,
+        errorCode: awsError.Code ?? awsError.code,
+        errorMessage: error.message,
+        httpStatusCode: awsError.$metadata?.httpStatusCode,
+        requestId: awsError.$metadata?.requestId,
+    };
+}
+
+function toCloudWatchHttpError(error: unknown, action: "StartQuery" | "GetQueryResults") {
+    const details = getAwsErrorDetails(error);
+    const errorName = details.errorName;
+
+    if (errorName === "AccessDeniedException" || errorName === "UnrecognizedClientException") {
+        return new HttpError(
+            502,
+            `CloudWatch Logs ${action} failed: AWS credentials or IAM permissions are not valid for Logs Insights`,
+            "CLOUDWATCH_ACCESS_DENIED",
+            details,
+            true
+        );
+    }
+
+    if (errorName === "ResourceNotFoundException") {
+        return new HttpError(
+            502,
+            `CloudWatch Logs ${action} failed: one of CLOUDWATCH_LOG_GROUP_NAMES does not exist in this region/account`,
+            "CLOUDWATCH_LOG_GROUP_NOT_FOUND",
+            details,
+            true
+        );
+    }
+
+    if (errorName === "MalformedQueryException" || errorName === "InvalidParameterException") {
+        return new HttpError(
+            502,
+            `CloudWatch Logs ${action} failed: Logs Insights rejected the query or parameters`,
+            "CLOUDWATCH_QUERY_REJECTED",
+            details,
+            true
+        );
+    }
+
+    return new HttpError(
+        502,
+        `CloudWatch Logs ${action} failed`,
+        "CLOUDWATCH_QUERY_FAILED",
+        details,
+        true
+    );
+}
+
 export class SecurityAlertService {
     static async getStoredAlerts(req: Request, res: Response) {
         return SecurityAlertService.queryCloudWatchAlerts(req, res);
@@ -64,7 +133,9 @@ export class SecurityAlertService {
             throw new HttpError(
                 500,
                 "CLOUDWATCH_LOG_GROUP_NAMES is not configured",
-                "CLOUDWATCH_LOG_GROUPS_NOT_CONFIGURED"
+                "CLOUDWATCH_LOG_GROUPS_NOT_CONFIGURED",
+                undefined,
+                true
             );
         }
 
@@ -108,10 +179,18 @@ export class SecurityAlertService {
             endTime: Math.floor(to.getTime() / 1000),
             queryString,
             limit,
-        }));
+        })).catch((error) => {
+            throw toCloudWatchHttpError(error, "StartQuery");
+        });
 
         if (!startResult.queryId) {
-            throw new HttpError(502, "CloudWatch Logs Insights did not return queryId", "CLOUDWATCH_QUERY_FAILED");
+            throw new HttpError(
+                502,
+                "CloudWatch Logs Insights did not return queryId",
+                "CLOUDWATCH_QUERY_FAILED",
+                undefined,
+                true
+            );
         }
 
         const deadline = Date.now() + env.CLOUDWATCH_LOGS_QUERY_TIMEOUT_MS;
@@ -123,7 +202,9 @@ export class SecurityAlertService {
 
             const queryResult = await cloudWatchLogsClient.send(new GetQueryResultsCommand({
                 queryId: startResult.queryId,
-            }));
+            })).catch((error) => {
+                throw toCloudWatchHttpError(error, "GetQueryResults");
+            });
 
             status = queryResult.status ?? "Unknown";
             results = queryResult.results ?? [];
@@ -134,7 +215,13 @@ export class SecurityAlertService {
         }
 
         if (status !== "Complete") {
-            throw new HttpError(504, `CloudWatch query did not complete: ${status}`, "CLOUDWATCH_QUERY_TIMEOUT");
+            throw new HttpError(
+                status === "Failed" ? 502 : 504,
+                `CloudWatch query did not complete: ${status}`,
+                status === "Failed" ? "CLOUDWATCH_QUERY_FAILED" : "CLOUDWATCH_QUERY_TIMEOUT",
+                { queryId: startResult.queryId, status },
+                true
+            );
         }
 
         return sendSuccess(res, results.map(toCloudWatchRecord), 200, {

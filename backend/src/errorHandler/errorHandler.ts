@@ -25,6 +25,9 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
     if (err instanceof HttpError) {
         if (err.status >= 500) {
             logInternalError(req, err);
+            if (err.expose) {
+                return sendError(res, err.status, err.code, err.message, err.details);
+            }
             return sendError(res, 500, "INTERNAL_SERVER_ERROR", "Internal Server Error");
         }
 
