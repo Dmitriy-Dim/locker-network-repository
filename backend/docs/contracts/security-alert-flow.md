@@ -2,9 +2,9 @@
 
 ## Context
 
-Backend and the alerting Lambda can run in different AWS accounts. In this setup, CloudWatch Logs should not subscribe directly to a cross-account Lambda. For cross-account delivery, use a CloudWatch Logs destination backed by Kinesis Data Streams or Firehose.
+Backend and Lambda can run in different AWS accounts. CloudWatch alarms should be created in the account and region where the source log group or metric exists. The current production path uses account-local CloudWatch Metric Filters, CloudWatch Alarms, and SNS email notifications.
 
-Recommended production flow for the simple per-account SNS model:
+Implemented production flow for the simple per-account SNS model:
 
 ```text
 Account A: Backend
@@ -29,9 +29,22 @@ Admin read path:
 
 No direct CloudWatch-to-CloudWatch link is required between accounts. If backend and Lambda run in different accounts, create alarms near the source log group/metric and point each account-local alarm to its own SNS topic or to a central notification topic.
 
+Current backend account setup:
+
+- ECS/Fargate task role can query CloudWatch Logs Insights with `logs:StartQuery`, `logs:GetQueryResults`, `logs:StopQuery`, and `logs:DescribeQueries`.
+- CloudWatch Metric Filter matches urgent structured security events with:
+
+```text
+{ $.category = "SECURITY_ALERT" && ($.severity = "CRITICAL" || $.severity = "HIGH") }
+```
+
+- Custom CloudWatch metrics are written under namespace `LockerSecurity`.
+- CloudWatch Alarm `LockerCriticalSecurityAlerts` publishes to SNS/email when a matching alert appears in a 1-minute evaluation window.
+- End-to-end path is ECS/Fargate logs -> CloudWatch Logs -> Metric Filter -> CloudWatch Alarm -> SNS -> email.
+
 ## Current Implementation
 
-Security alerts now exist in the backend stdout log stream and can be selected by CloudWatch Logs subscription filters.
+Security alerts now exist in the backend stdout log stream and can be selected by CloudWatch Logs Insights queries or CloudWatch Metric Filters.
 
 - Shared emitter: `backend/src/utils/securityAlert.ts`
 - Admin CloudWatch Logs Insights API: `GET /api/v1/admin/security-alerts`
@@ -84,9 +97,15 @@ Suspicious events that do not mutate business state, such as invalid tokens, fai
 
 ## Target Log Contract
 
-Backend and Lambda services should write alertable events to stdout as structured JSON. CloudWatch Logs subscription filters can then select only alert records.
+Backend and Lambda services should write alertable events to stdout as structured JSON. CloudWatch Logs metric filters can then select records for alarms.
 
-Subscription filter pattern:
+Urgent notification metric filter pattern:
+
+```text
+{ $.category = "SECURITY_ALERT" && ($.severity = "CRITICAL" || $.severity = "HIGH") }
+```
+
+General discovery filter pattern:
 
 ```text
 { $.category = "SECURITY_ALERT" }
@@ -342,25 +361,16 @@ Usually aggregate by IP, route, actor, or event type before notifying.
 }
 ```
 
-## Alert Lambda Behavior
+## Severity Routing
 
-The alert Lambda should:
-
-1. Decode CloudWatch Logs records from Kinesis.
-2. Parse each log line as JSON.
-3. Keep only records where `category === "SECURITY_ALERT"`.
-4. Validate required fields.
-5. Deduplicate repeated alerts by key.
-6. Route alerts by severity.
-
-Suggested routing:
+Current SNS/email alarm routing:
 
 | Severity | Behavior |
 | --- | --- |
-| `CRITICAL` | Send immediately |
-| `HIGH` | Send immediately with 5-15 minute dedupe window |
-| `MEDIUM` | Aggregate and send summary |
-| `LOW` | Store only, no immediate admin notification |
+| `CRITICAL` | Send immediate SNS/email notification |
+| `HIGH` | Send immediate SNS/email notification |
+| `MEDIUM` | Available through CloudWatch Logs Insights/admin API only |
+| `LOW` | Available through CloudWatch Logs Insights/admin API only |
 
 Suggested dedupe keys:
 
@@ -372,46 +382,39 @@ eventType + details.stationId + details.lockerBoxId
 
 ## AWS Setup Summary
 
-In the security account:
-
-1. Create Kinesis Data Stream for security alerts.
-2. Create CloudWatch Logs destination backed by the stream.
-3. Add destination policy allowing the backend account to subscribe.
-4. Attach Alert Lambda to the Kinesis stream.
-5. Attach Firehose or another consumer if S3 archive is required.
-6. Configure SNS/email/Slack/Telegram delivery from Alert Lambda.
-7. Add DLQ for Alert Lambda.
-
 In the backend account:
 
 1. Ensure backend writes structured JSON to CloudWatch Logs.
-2. Create a subscription filter on the backend log group.
-3. Use the cross-account destination ARN from the security account.
-4. Use a filter pattern that selects `SECURITY_ALERT` events only.
-5. Set `CLOUDWATCH_LOG_GROUP_NAMES` for backend read-through queries.
+2. Grant the ECS/Fargate task role CloudWatch Logs Insights read permissions:
+   - `logs:StartQuery`
+   - `logs:GetQueryResults`
+   - `logs:StopQuery`
+   - `logs:DescribeQueries`
+3. Create a CloudWatch Metric Filter on the backend log group for urgent alerts.
+4. Create custom metric(s) in namespace `LockerSecurity`.
+5. Create CloudWatch Alarm `LockerCriticalSecurityAlerts` with a 1-minute evaluation window.
+6. Connect the alarm to SNS/email.
+7. Set `CLOUDWATCH_LOG_GROUP_NAMES` for backend admin read-through queries.
 
-Example subscription filter:
+Example urgent metric filter:
 
 ```bash
-aws logs put-subscription-filter \
+aws logs put-metric-filter \
   --log-group-name /aws/backend/locker-api \
-  --filter-name security-alerts-to-security-account \
-  --filter-pattern '{ $.category = "SECURITY_ALERT" }' \
-  --destination-arn arn:aws:logs:eu-west-1:SECURITY_ACCOUNT_ID:destination:locker-security-alerts
+  --filter-name high-critical-security-alerts \
+  --filter-pattern '{ $.category = "SECURITY_ALERT" && ($.severity = "CRITICAL" || $.severity = "HIGH") }' \
+  --metric-transformations metricName=HighCriticalSecurityAlerts,metricNamespace=LockerSecurity,metricValue=1
 ```
 
 ## Monitoring
 
 Add CloudWatch alarms for:
 
-- Alert Lambda errors
-- Alert Lambda throttles
-- Alert Lambda DLQ messages
-- Kinesis iterator age
-- Kinesis write throttles
-- Firehose delivery failures
-- S3 delivery errors
-- CloudWatch Logs subscription delivery errors
+- `LockerSecurity/HighCriticalSecurityAlerts`
+- backend task/service failures
+- backend 5xx spikes
+- SQS send failures
+- Lambda errors/throttles/DLQ messages when Lambda log groups are included in the same monitoring model
 
 ## Code Changes To Add
 
@@ -429,25 +432,17 @@ Backend:
 - Remaining: add admin role change alerts.
 - Remaining: add Redis write failure alerts where cache writes fail.
 - Remaining: add tests for payment and SQS alert emission.
-- AWS/IaC: configure CloudWatch metric filters, alarms, SNS topics, and subscriptions in the account where each source log group/metric exists.
+- AWS/IaC: CloudWatch metric filter, `LockerSecurity` metrics, `LockerCriticalSecurityAlerts`, SNS, and email subscription are configured in the backend account.
 
-Lambda:
+Lambda future work:
 
-- Write locker operation failures as `SECURITY_ALERT` JSON.
+- Write locker operation failures as `SECURITY_ALERT` JSON if Lambda alerts should be visible in the same admin/security model.
 - Write cache projection failures as `SECURITY_ALERT` JSON.
 - Write DynamoDB update failures as `SECURITY_ALERT` JSON.
 - Keep normal command logs separate from alert logs.
 
-Alert Lambda:
-
-- Implement CloudWatch Logs decoding.
-- Implement validation and dedupe.
-- Implement severity routing.
-- Persist alert delivery state if dedupe must survive cold starts.
-
 ## Notes
 
 - Keep the current audit DB for user/admin action history.
-- Use CloudWatch/Kinesis/Firehose for cross-account real-time alerting and archive.
+- Use CloudWatch Logs Insights/admin API for investigation and CloudWatch Alarm -> SNS for urgent notifications.
 - Avoid logging sensitive values. Store IDs and safe metadata only.
-- Treat CloudWatch Logs subscriptions as at-least-once delivery. Alert Lambda must be idempotent.

@@ -2,9 +2,21 @@
 
 ## CloudWatch: Backend -> Security Alert Pipeline
 
-Backend alertable events are written to stdout as structured JSON. In ECS these records go to the backend CloudWatch Logs group and can be selected by a subscription filter. Alerts are not persisted to RDS.
+Backend alertable events are written to stdout as structured JSON. In ECS these records go to the backend CloudWatch Logs group and can be selected by CloudWatch Logs Insights or Metric Filters. Alerts are not persisted to RDS.
 
-### Subscription filter
+### Metric filter for urgent notifications
+
+Use this filter for the CloudWatch Alarm that sends SNS/email notifications:
+
+```text
+{ $.category = "SECURITY_ALERT" && ($.severity = "CRITICAL" || $.severity = "HIGH") }
+```
+
+This keeps `MEDIUM` and `LOW` alerts available through CloudWatch Logs Insights and the admin API without sending immediate email notifications.
+
+### General discovery filter
+
+Use this broader filter for dashboards, ad-hoc checks, or non-urgent counters:
 
 ```text
 { $.category = "SECURITY_ALERT" }

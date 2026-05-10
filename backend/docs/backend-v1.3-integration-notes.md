@@ -62,7 +62,17 @@ Query params:
 - `actorId`
 - `correlationId`
 
-CloudWatch read-through requires `CLOUDWATCH_LOG_GROUP_NAMES`. Urgent notifications should be configured in AWS with CloudWatch Metric Filters/Alarms -> SNS in the account where the source log group or metric exists.
+CloudWatch read-through requires `CLOUDWATCH_LOG_GROUP_NAMES`.
+
+Urgent admin notifications are configured in AWS with:
+
+- CloudWatch Metric Filter:
+  `{ $.category = "SECURITY_ALERT" && ($.severity = "CRITICAL" || $.severity = "HIGH") }`
+- custom metric namespace: `LockerSecurity`
+- alarm: `LockerCriticalSecurityAlerts`
+- delivery: CloudWatch Alarm -> SNS -> email
+
+`MEDIUM` and `LOW` alerts are still readable through CloudWatch Logs Insights/admin API, but do not trigger the urgent email alarm.
 
 ### More Specific GET Queries
 
