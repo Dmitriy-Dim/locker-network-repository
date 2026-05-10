@@ -18,3 +18,11 @@ export const getOperationStatus = async (req: Request, res: Response, next: Next
         next(e);
     }
 }
+
+export const streamOperationStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await operationReadService.streamOperationStatus(req, res);
+    } catch (e) {
+        next(e);
+    }
+}

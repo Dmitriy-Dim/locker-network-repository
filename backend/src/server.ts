@@ -7,7 +7,6 @@ import express, {Application, NextFunction, Request, Response} from 'express'
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
-import morgan from "morgan";
 import qs from 'qs';
 import swaggerUi from "swagger-ui-express"
 
@@ -27,6 +26,9 @@ import { citiesRoutes } from './routes/citiesRoutes';
 import {adminRoutes} from "./routes/adminRoutes";
 import {pricingRoutes} from "./routes/pricingRoutes";
 import {devicesRoutes} from "./routes/deviceRoutes";
+import {securityAlertRoutes} from "./routes/securityAlertRoutes";
+import {auditLogRoutes} from "./routes/auditLogRoutes";
+import {getRequestIpAddress} from "./utils/securityAlert";
 
 const PORT = env.PORT;
 const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
@@ -68,13 +70,31 @@ export const createApp = () => {
 
     //===============Logging============
 
-    app.use(
-        morgan("combined", {
-            stream: {
-                write: (message) => logger.info(message.trim()),
-            },
-        })
-    );
+    app.use((req: Request, res: Response, next: NextFunction) => {
+        const startedAt = process.hrtime.bigint();
+
+        res.on("finish", () => {
+            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+            if (req.path === "/health" && res.statusCode < 500) {
+                return;
+            }
+
+            logger.info("HTTP_ACCESS", {
+                category: "HTTP_ACCESS",
+                correlationId: req.correlationId,
+                method: req.method,
+                path: req.path,
+                statusCode: res.statusCode,
+                durationMs: Math.round(durationMs),
+                ipAddress: getRequestIpAddress(req),
+                userAgent: req.get("user-agent") ?? "unknown",
+                contentLength: res.getHeader("content-length"),
+            });
+        });
+
+        next();
+    });
 
     //===============Middleware============
     app.use("/api/v1/payments/webhook", express.raw({ type: "application/json", limit: "256kb" }));
@@ -151,6 +171,8 @@ export const createApp = () => {
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
     app.use(`${API_PREFIX}/admin/users`, adminRoutes)
+    app.use(`${API_PREFIX}/admin/security-alerts`, securityAlertRoutes)
+    app.use(`${API_PREFIX}/admin/audit-logs`, auditLogRoutes)
     app.use(`${API_PREFIX}/pricing`, pricingRoutes);
     app.use(`${API_PREFIX}/devices`, devicesRoutes);
 

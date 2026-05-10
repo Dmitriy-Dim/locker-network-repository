@@ -33,7 +33,22 @@ export const getLockersWithParamsSchema = z.object({
         stationId: z.string().uuid().optional(),
         size: LockerSizeEnum.optional(),
         status: LockerStatusEnum.optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
     })
+});
+
+export const getAdminLockersQuerySchema = z.object({
+    query: z.object({
+        stationId: z.string().uuid().optional(),
+        city: z.string().trim().min(1).optional(),
+        code: z.string().trim().min(1).optional(),
+        size: LockerSizeEnum.optional(),
+        status: LockerStatusEnum.optional(),
+        techStatus: TechnicalStatusEnum.optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
+    }),
 });
 
 export const oneLockerSchema = z.object({

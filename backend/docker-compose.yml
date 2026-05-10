@@ -105,6 +105,9 @@ services:
       STRIPE_WEBHOOK_SECRET: whsec_localstack_test
       USE_LAMBDA_HEALTH: "false"
       LAMBDA_HEALTH_URL: ""
+      BOOKING_EXPIRATION_DISABLED: "false"
+      BOOKING_EXPIRATION_INTERVAL_MS: "60000"
+      BOOKING_EXPIRATION_BATCH_SIZE: "100"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3555/health >/dev/null 2>&1 || exit 1"]
       interval: 15s

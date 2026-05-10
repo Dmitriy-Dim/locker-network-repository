@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { Prisma } from '@prisma/client';
 
 import { prismaService } from '../services/prismaService';
 import {auditLogger} from '../Logger/winston';
@@ -10,6 +11,7 @@ type AuditAction =
     | 'USER_REGISTER'
     | 'USER_ROLE_UPDATE'
     | 'USER_ROLE_UPDATE_FAILED'
+    | 'AUDIT_LOG_READ'
     | 'TOKEN_REFRESH'
     | 'TOKEN_REVOKED'
     | 'OPERATION_CREATE'
@@ -37,6 +39,8 @@ type AuditAction =
     | 'BOOKING_INFO_FAILED'
     | 'BOOKING_CANCEL'
     | 'BOOKING_CANCEL_FAILED'
+    | 'BOOKING_EXPIRE'
+    | 'BOOKING_EXPIRE_FAILED'
     | 'BOOKING_UPDATE_STATUS'
     | 'BOOKING_UPDATE_STATUS_FAILED'
     | "CITY_CREATE"
@@ -70,6 +74,45 @@ interface AuditParams {
     details?: Record<string, unknown>;
 }
 
+const sensitiveKeyFragments = [
+    "password",
+    "token",
+    "authorization",
+    "cookie",
+    "signature",
+    "secret",
+    "apiKey",
+    "apikey",
+    "privateKey",
+];
+
+function shouldRedactKey(key: string) {
+    const normalizedKey = key.toLowerCase();
+
+    return sensitiveKeyFragments.some((fragment) => normalizedKey.includes(fragment.toLowerCase()));
+}
+
+export function sanitizeAuditDetails(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map((item) => sanitizeAuditDetails(item));
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (value && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
+                key,
+                shouldRedactKey(key) ? "[REDACTED]" : sanitizeAuditDetails(nestedValue),
+            ])
+        );
+    }
+
+    return value;
+}
+
 export const logAudit = async ({
                                    req,
                                    action,
@@ -80,6 +123,13 @@ export const logAudit = async ({
                                    details,
                                }: AuditParams): Promise<void> => {
     try {
+        const sanitizedDetails = sanitizeAuditDetails({
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent') ?? 'unknown',
+            correlationId: req.headers['x-correlation-id'],
+            ...details,
+        }) as Prisma.InputJsonValue;
+
         await prismaService.auditLog.create({
             data: {
                 actorId,
@@ -87,12 +137,7 @@ export const logAudit = async ({
                 action,
                 entityType,
                 entityId,
-                details: {
-                    ipAddress: req.ip,
-                    userAgent: req.get('user-agent') ?? 'unknown',
-                    correlationId: req.headers['x-correlation-id'],
-                    ...details,
-                },
+                details: sanitizedDetails,
             },
         });
     } catch (err) {

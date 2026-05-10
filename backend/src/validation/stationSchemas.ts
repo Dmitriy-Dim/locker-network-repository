@@ -18,11 +18,14 @@ export const createStationSchema = z.object({
 
 export const getStationsWithParamsSchema = z.object({
     query: z.object({
+        cityId: z.string().uuid().optional(),
         city: z.string().optional(),
         lat:z.string().optional(),
         lng:z.string().optional(),
         radius: z.string().optional(),
         status: StationStatusEnum.optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
     }).refine(
         (data) =>
             (!data.lat && !data.lng) ||
@@ -32,6 +35,16 @@ export const getStationsWithParamsSchema = z.object({
             path: ["lat"],
         }
     ),
+});
+
+export const getAdminStationsQuerySchema = z.object({
+    query: z.object({
+        cityId: z.string().uuid().optional(),
+        city: z.string().trim().min(1).optional(),
+        status: StationStatusEnum.optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
+    }),
 });
 
 export const oneStationSchema = z.object({

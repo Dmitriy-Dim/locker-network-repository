@@ -49,8 +49,15 @@ const envSchema = z.object({
     SQS_ROLE_SESSION_NAME: z.string().optional(),
     SQS_ENDPOINT_URL: optionalUrl,
     LOG_LEVEL: z.string().default("info"),
+    CLOUDWATCH_LOG_GROUP_NAMES: z.string().optional(),
+    CLOUDWATCH_LOGS_ROLE_ARN: z.string().optional(),
+    CLOUDWATCH_LOGS_ROLE_SESSION_NAME: z.string().optional(),
+    CLOUDWATCH_LOGS_QUERY_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
     USE_LAMBDA_HEALTH: z.string().default("false"),
     LAMBDA_HEALTH_URL: optionalUrl,
+    BOOKING_EXPIRATION_DISABLED: z.string().default("false"),
+    BOOKING_EXPIRATION_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+    BOOKING_EXPIRATION_BATCH_SIZE: z.coerce.number().int().positive().max(500).default(100),
 });
 
 const parsed = envSchema.safeParse(process.env);

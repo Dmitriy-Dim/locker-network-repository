@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { BookingStatus, Role } from "@prisma/client";
+import { BookingStatus, Prisma, Role } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 
 import { BookingInitRequestDto, BookingRecordDto } from "../contracts/booking.dto";
@@ -13,7 +13,8 @@ import {
     sendBookingCancelToQueue,
     sendBookingExtendToQueue,
     sendBookingInitToQueue,
-    sendBookingStatusUpdateToQueue
+    sendBookingStatusUpdateToQueue,
+    sendCloseLockerUserCommand
 } from "./sqsService";
 import { getAllBookings, getBooking, getLockerCache } from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
@@ -215,14 +216,41 @@ export class BookingService {
     }
 
     async getAllBookingsAdmin(req: Request, res: Response) {
-        const result = await prismaService.booking.findMany({
-            include: {
-                payments: true,
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const status = req.query.status as BookingStatus | undefined;
+        const userId = req.query.userId as string | undefined;
+        const lockerBoxId = req.query.lockerBoxId as string | undefined;
+        const stationId = req.query.stationId as string | undefined;
+        const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
+        const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
+        const where: Prisma.BookingWhereInput = {
+            ...(status && { status }),
+            ...(userId && { userId }),
+            ...(lockerBoxId && { lockerBoxId }),
+            ...(stationId && { stationId }),
+            ...((from || to) && {
+                createdAt: {
+                    ...(from && { gte: from }),
+                    ...(to && { lte: to }),
+                },
+            }),
+        };
+
+        const [result, total] = await prismaService.$transaction([
+            prismaService.booking.findMany({
+                where,
+                include: {
+                    payments: true,
+                },
+                orderBy: {
+                    createdAt: "desc",
+                },
+                skip,
+                ...(limit !== undefined && { take: limit }),
+            }),
+            prismaService.booking.count({ where }),
+        ]);
 
         await logAudit({
             req,
@@ -234,10 +262,24 @@ export class BookingService {
                 sourceOfTruth: "postgres",
                 count: result.length,
                 scope: "admin",
+                filters: {
+                    status,
+                    userId,
+                    lockerBoxId,
+                    stationId,
+                    from: from?.toISOString(),
+                    to: to?.toISOString(),
+                    limit,
+                    skip,
+                },
             },
         });
 
-        return sendSuccess(res, result);
+        return sendSuccess(res, result, 200, {
+            limit,
+            skip,
+            total,
+        });
     }
 
     async getBookingAdmin(req: Request, res: Response) {
@@ -497,6 +539,158 @@ export class BookingService {
         );
     }
 
+    async endBooking(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const bookingWithLocker = await loadBookingWithLockerStatus(bookingId);
+
+        if (!bookingWithLocker) {
+            throw new HttpError(404, "Booking not found");
+        }
+
+        const { booking, lockerStatus } = bookingWithLocker;
+        const userId = req.user?.userId;
+        const role = req.user?.role;
+
+        if (role === Role.USER && booking.userId !== userId) {
+            throw new HttpError(403, "Access denied");
+        }
+
+        const existing = await prismaService.booking.findUnique({
+            where: { bookingId },
+        });
+
+        if (!existing) {
+            throw new HttpError(404, "Booking not found");
+        }
+
+        if (role === Role.USER && existing.userId !== userId) {
+            throw new HttpError(403, "Access denied");
+        }
+
+        if (existing.status === BookingStatus.ENDED) {
+            return sendSuccess(res, {
+                bookingId: booking.bookingId,
+                bookingStatus: existing.status,
+                lockerStatus,
+                message: "Booking already ended",
+            });
+        }
+
+        if (existing.status !== BookingStatus.ACTIVE) {
+            throw new HttpError(409, "Booking can be ended only while active");
+        }
+
+        if (!existing.expectedEndTime) {
+            throw new HttpError(409, "Booking does not have expectedEndTime");
+        }
+
+        if (existing.expectedEndTime <= new Date()) {
+            throw new HttpError(409, "Booking has expired");
+        }
+
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
+        return idempotencyService.execute(
+            req,
+            res,
+            `booking-end:${bookingId}`,
+            { bookingId },
+            async () => {
+                const operationId = uuidv4();
+
+                try {
+                    const updated = await prismaService.booking.update({
+                        where: { bookingId },
+                        data: {
+                            status: BookingStatus.ENDED,
+                            endTime: new Date(),
+                        },
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.LOCKER_CLOSE,
+                    });
+
+                    const requestedAt = new Date().toISOString();
+
+                    await sendCloseLockerUserCommand({
+                        operationId,
+                        type: OperationType.LOCKER_CLOSE,
+                        payload: {
+                            userId,
+                            stationId: booking.stationId,
+                            lockerBoxId: booking.lockerBoxId,
+                            bookingId,
+                            clientRequestId: (req.headers["x-correlation-id"] as string | undefined) ?? uuidv4(),
+                            requestedAt,
+                            finalizeBooking: true,
+                        },
+                    });
+
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_UPDATE_STATUS,
+                        actorId: userId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            operationType: OperationType.LOCKER_CLOSE,
+                            bookingId,
+                            previousStatus: existing.status,
+                            nextStatus: BookingStatus.ENDED,
+                            previousLockerStatus: lockerStatus,
+                            sourceOfTruth: "postgres-localstack-sync",
+                        },
+                    });
+
+                    return {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
+                            operationId,
+                            OperationType.LOCKER_CLOSE,
+                            {
+                                bookingId,
+                                lockerBoxId: booking.lockerBoxId,
+                                stationId: booking.stationId,
+                                persistedStatus: updated.status,
+                                finalClose: true,
+                            },
+                            "Booking end queued"
+                        ),
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to queue booking end";
+
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
+                        actorId: userId,
+                        entityId: bookingId,
+                        entityType: "Booking",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            previousStatus: existing.status,
+                            nextStatus: BookingStatus.ENDED,
+                            previousLockerStatus: lockerStatus,
+                            reason: errorMessage,
+                            sourceOfTruth: "postgres",
+                        },
+                    });
+
+                    throw new HttpError(500, errorMessage);
+                }
+            }
+        );
+    }
+
     async getAllBookings(req: Request, res: Response) {
         const userId = req.user?.userId;
 
@@ -505,9 +699,18 @@ export class BookingService {
         }
 
         const allBookings = await getAllBookings() as BookingRecordDto[];
-        const ownBookings = allBookings.filter((booking) => booking.userId === userId);
+        const status = req.query.status as BookingStatus | undefined;
+        const lockerBoxId = req.query.lockerBoxId as string | undefined;
+        const stationId = req.query.stationId as string | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const ownBookings = allBookings
+            .filter((booking) => booking.userId === userId)
+            .filter((booking) => !status || booking.status === status)
+            .filter((booking) => !lockerBoxId || booking.lockerBoxId === lockerBoxId)
+            .filter((booking) => !stationId || booking.stationId === stationId);
         const result = await Promise.all(
-            ownBookings.map(async (booking) => {
+            ownBookings.slice(skip, limit === undefined ? undefined : skip + limit).map(async (booking) => {
                 const locker = await getLockerCache(booking.lockerBoxId);
                 return toPublicBookingResponse({
                     bookingId: booking.bookingId,
@@ -532,10 +735,21 @@ export class BookingService {
                 sourceOfTruth: "dynamodb",
                 count: result.length,
                 scope: "self",
+                filters: {
+                    status,
+                    lockerBoxId,
+                    stationId,
+                    limit,
+                    skip,
+                },
             },
         });
 
-        return sendSuccess(res, result);
+        return sendSuccess(res, result, 200, {
+            limit,
+            skip,
+            total: ownBookings.length,
+        });
     }
 
     async extendBooking(req: Request, res: Response) {

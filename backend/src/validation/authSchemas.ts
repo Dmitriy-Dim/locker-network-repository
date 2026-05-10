@@ -7,10 +7,12 @@ const passwordSchema = z.string()
     .regex(/[0-9]/, 'Must have number')
     .regex(/[^A-Za-z0-9]/, 'Must have special char');
 
+const emailSchema = z.string().trim().toLowerCase().email();
+
 export const signupSchema = z.object({
     body: z.object({
-        name: z.string().min(2),
-        email: z.string().email(),
+        name: z.string().trim().min(2),
+        email: emailSchema,
         password: passwordSchema,
         phone: z.string()
             .regex(/^\+?[1-9]\d{7,14}$/, 'Invalid phone number')
@@ -20,7 +22,7 @@ export const signupSchema = z.object({
 
 export const loginSchema = z.object({
     body: z.object({
-        email: z.string().email(),
+        email: emailSchema,
         password: z.string().min(1),
     }),
 });

@@ -23,9 +23,23 @@ import {
 import { prismaService } from "./prismaService";
 
 export class LockerStationServiceImplPostgres {
-    async getAllStation(_req: Request, res: Response) {
+    async getAllStation(req: Request, res: Response) {
         const stations = await lockerCatalogProjectionService.getAllStationsAdminView();
-        return sendSuccess(res, stations);
+        const cityId = req.query.cityId as string | undefined;
+        const city = req.query.city as string | undefined;
+        const status = req.query.status as StationQuery["status"] | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const filteredStations = stations
+            .filter((station) => !cityId || station.cityId === cityId)
+            .filter((station) => !city || station.city.code === city || station.city.name.toLowerCase().includes(city.toLowerCase()))
+            .filter((station) => !status || station.status === status);
+
+        return sendSuccess(res, filteredStations.slice(skip, limit === undefined ? undefined : skip + limit), 200, {
+            limit,
+            skip,
+            total: filteredStations.length,
+        });
     }
 
     async createStation(req: Request, res: Response) {
@@ -116,15 +130,19 @@ export class LockerStationServiceImplPostgres {
     }
 
     async getStations(req: Request, res: Response) {
+        const cityId = req.query.cityId as string | undefined;
         const city = req.query.city as string | undefined;
         const status = req.query.status as StationQuery["status"] | undefined;
         const lat = req.query.lat ? Number(req.query.lat) : undefined;
         const lng = req.query.lng ? Number(req.query.lng) : undefined;
         const radius = req.query.radius ? Number(req.query.radius) : undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
 
         const stations = await loadStationsWithFallback();
 
         const result = stations
+            .filter((station) => !cityId || station.cityId === cityId)
             .filter((station) => !city || station.city.code === city)
             .filter((station) => !status || station.status === status)
             .map((station) => {
@@ -151,7 +169,11 @@ export class LockerStationServiceImplPostgres {
                 return left.distance - right.distance;
             });
 
-        return sendSuccess(res, result);
+        return sendSuccess(res, result.slice(skip, limit === undefined ? undefined : skip + limit), 200, {
+            limit,
+            skip,
+            total: result.length,
+        });
     }
 
     async getOneStation(req: Request, res: Response) {

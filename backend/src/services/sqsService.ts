@@ -6,6 +6,7 @@ import { LockerCacheDto } from "../contracts/cache.dto";
 import { HttpError } from "../errorHandler/HttpError";
 import { sqsClient } from "../utils/sqsClient";
 import {env} from "../config/env";
+import {emitSecurityAlert} from "../utils/securityAlert";
 
 import {OperationType} from "./dto/operationDto";
 
@@ -107,6 +108,7 @@ export type CloseLockerUserCommand = {
         bookingId: string;
         clientRequestId: string;
         requestedAt: string;
+        finalizeBooking?: boolean;
     };
 };
 
@@ -171,19 +173,33 @@ type LockerCacheProjectionEvent =
     };
 
 async function sendCommandToQueue(command: QueueCommand) {
-    await sqsClient.send(
-        new SendMessageCommand({
-            QueueUrl: QUEUE_URL,
-            MessageBody: JSON.stringify(command),
+    try {
+        await sqsClient.send(
+            new SendMessageCommand({
+                QueueUrl: QUEUE_URL,
+                MessageBody: JSON.stringify(command),
 
-            MessageAttributes: {
-                type: {
-                    DataType: "String",
-                    StringValue: command.type,
+                MessageAttributes: {
+                    type: {
+                        DataType: "String",
+                        StringValue: command.type,
+                    },
                 },
+            })
+        );
+    } catch (error) {
+        emitSecurityAlert({
+            eventType: "SQS_SEND_FAILED",
+            severity: "HIGH",
+            reason: "Backend failed to enqueue SQS command",
+            details: {
+                commandType: command.type,
+                operationId: command.operationId,
+                error: error instanceof Error ? error.message : "Unknown error",
             },
-        })
-    );
+        });
+        throw error;
+    }
 }
 
 function getCacheProjectionQueueUrl() {
@@ -195,22 +211,40 @@ function getCacheProjectionQueueUrl() {
 }
 
 async function sendCacheProjectionEvent(event: LockerCacheProjectionEvent) {
-    await sqsClient.send(
-        new SendMessageCommand({
-            QueueUrl: getCacheProjectionQueueUrl(),
-            MessageBody: JSON.stringify(event),
-            MessageAttributes: {
-                entityType: {
-                    DataType: "String",
-                    StringValue: event.entityType,
+    try {
+        await sqsClient.send(
+            new SendMessageCommand({
+                QueueUrl: getCacheProjectionQueueUrl(),
+                MessageBody: JSON.stringify(event),
+                MessageAttributes: {
+                    entityType: {
+                        DataType: "String",
+                        StringValue: event.entityType,
+                    },
+                    eventType: {
+                        DataType: "String",
+                        StringValue: event.eventType,
+                    },
                 },
-                eventType: {
-                    DataType: "String",
-                    StringValue: event.eventType,
-                },
+            })
+        );
+    } catch (error) {
+        emitSecurityAlert({
+            eventType: "SQS_SEND_FAILED",
+            severity: "HIGH",
+            reason: "Backend failed to enqueue cache projection event",
+            correlationId: event.correlationId,
+            actorId: event.actorId,
+            details: {
+                entityType: event.entityType,
+                eventType: event.eventType,
+                entityId: event.entityId,
+                projectionVersion: event.projectionVersion,
+                error: error instanceof Error ? error.message : "Unknown error",
             },
-        })
-    );
+        });
+        throw error;
+    }
 }
 
 function buildCacheProjectionEnvelope(
@@ -232,10 +266,6 @@ function buildCacheProjectionEnvelope(
 
 export async function sendOperationToQueue(operation: QueueCommand) {
     await sendCommandToQueue(operation);
-}
-
-export async function sendSecurityEventToQueue(event: QueueCommand) {
-    await sendCommandToQueue(event);
 }
 
 export async function sendPaymentConfirmToQueue(command: PaymentConfirmCommand) {

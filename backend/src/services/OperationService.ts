@@ -73,6 +73,15 @@ function buildOperationResponsePayload(operation: Operation & Record<string, unk
     };
 }
 
+function isTerminalOperationStatus(status: unknown) {
+    return status === OperationStatus.SUCCESS || status === OperationStatus.FAILED;
+}
+
+function writeSseEvent(res: Response, event: string, data: unknown) {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 export class OperationCommandService {
     async createHealthCheckOperation(req: Request, res: Response) {
         return idempotencyService.execute(
@@ -195,6 +204,101 @@ export class OperationReadService {
         //==========================
 
         return sendSuccess(res, buildOperationResponsePayload(operation as Operation & Record<string, unknown>));
+    }
+
+    async streamOperationStatus(req: Request, res: Response) {
+        const operationId = req.params.id as string;
+        let closed = false;
+        let lastPayload = "";
+        const startedAt = Date.now();
+        const maxStreamMs = 65_000;
+        const pollMs = 1_500;
+        let interval: NodeJS.Timeout | undefined;
+        let heartbeat: NodeJS.Timeout | undefined;
+
+        const cleanup = () => {
+            closed = true;
+            if (interval) {
+                clearInterval(interval);
+            }
+            if (heartbeat) {
+                clearInterval(heartbeat);
+            }
+        };
+
+        const loadOperation = async () => {
+            const operation = await operationRepository.findById(operationId);
+
+            if (!operation) {
+                throw new HttpError(404, "Operation not found");
+            }
+
+            if (req.user?.role === Role.USER && operation.userId && operation.userId !== req.user.userId) {
+                throw new HttpError(403, "Access denied");
+            }
+
+            return operation as Operation & Record<string, unknown>;
+        };
+
+        const pushOperation = async () => {
+            try {
+                const operation = await loadOperation();
+                const payload = buildOperationResponsePayload(operation);
+                const serialized = JSON.stringify(payload);
+
+                if (serialized !== lastPayload) {
+                    lastPayload = serialized;
+                    writeSseEvent(res, "operation", payload);
+                }
+
+                if (isTerminalOperationStatus(operation.status)) {
+                    cleanup();
+                    res.end();
+                    return;
+                }
+
+                if (Date.now() - startedAt >= maxStreamMs) {
+                    writeSseEvent(res, "timeout", {
+                        operationId,
+                        message: "Operation stream timeout; client should fall back to status polling",
+                    });
+                    cleanup();
+                    res.end();
+                }
+            } catch (e) {
+                const status = e instanceof HttpError ? e.status : 500;
+                const message = e instanceof Error ? e.message : "Failed to stream operation status";
+
+                writeSseEvent(res, "error", {
+                    operationId,
+                    status,
+                    message,
+                });
+                cleanup();
+                res.end();
+            }
+        };
+
+        req.on("close", cleanup);
+        res.status(200);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache, no-transform");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders?.();
+
+        interval = setInterval(() => {
+            if (!closed) {
+                void pushOperation();
+            }
+        }, pollMs);
+        heartbeat = setInterval(() => {
+            if (!closed) {
+                res.write(": keep-alive\n\n");
+            }
+        }, 15_000);
+
+        await pushOperation();
     }
 }
 

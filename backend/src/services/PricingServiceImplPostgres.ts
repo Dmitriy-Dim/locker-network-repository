@@ -63,24 +63,43 @@ export class PricingServiceImplPostgres {
     async getAllPrices(req: Request, res: Response) {
         const cityId = req.query.cityId as string;
         const size = req.query.size as LockerSize;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
 
-        const prices = await prismaService.pricing.findMany({
-            where: {
-                ...(cityId && { cityId }),
-                ...(size && { size }),
-            },
-            include: {
-                city: {
-                    select: { code: true, name: true },
+        const where = {
+            ...(cityId && { cityId }),
+            ...(size && { size }),
+        };
+
+        const [prices, total] = await prismaService.$transaction([
+            prismaService.pricing.findMany({
+                where,
+                include: {
+                    city: {
+                        select: { code: true, name: true },
+                    },
                 },
-            },
-        });
+                orderBy: [
+                    { cityId: "asc" },
+                    { size: "asc" },
+                ],
+                skip,
+                ...(limit !== undefined && { take: limit }),
+            }),
+            prismaService.pricing.count({ where }),
+        ]);
 
 
         const result = prices.map(p => ({
             ...p,
             pricePerHour: Number(p.pricePerHour),
         }));
+
+        res.setHeader("x-total-count", total);
+        res.setHeader("x-skip", skip);
+        if (limit !== undefined) {
+            res.setHeader("x-limit", limit);
+        }
 
         return res.json(result);
     }

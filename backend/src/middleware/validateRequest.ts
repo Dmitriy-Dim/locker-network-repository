@@ -3,16 +3,28 @@ import {ZodError, ZodTypeAny} from "zod";
 
 import {HttpError} from "../errorHandler/HttpError";
 
+type ParsedRequestParts = {
+    body?: unknown;
+    params?: Request["params"];
+    query?: Request["query"];
+    cookies?: Request["cookies"];
+};
+
 export const validateRequest =
     (schema: ZodTypeAny) =>
         (req: Request, res: Response, next: NextFunction) => {
             try {
-                schema.parse({
+                const parsed = schema.parse({
                     body: req.body,
                     params: req.params,
                     query: req.query,
                     cookies: req.cookies,
-                });
+                }) as ParsedRequestParts;
+
+                req.body = parsed.body ?? req.body;
+                req.params = parsed.params ?? req.params;
+                req.query = parsed.query ?? req.query;
+                req.cookies = parsed.cookies ?? req.cookies;
 
                 next();
             } catch (e) {
