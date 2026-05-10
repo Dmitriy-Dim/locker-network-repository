@@ -24,6 +24,25 @@ The existing polling endpoint remains supported:
 - `GET /api/v1/operations/:id`
 - `GET /operations/:id`
 
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "operationId": "op_123",
+    "type": "LOCKER_CLOSE",
+    "status": "SUCCESS",
+    "timestamp": "2026-05-10T09:00:00.000Z",
+    "result": {
+      "lockStatus": "LOCKED",
+      "doorStatus": "CLOSED",
+      "bookingStatus": "ENDED"
+    }
+  }
+}
+```
+
 ### RDS Audit Logs
 
 Backend now exposes admin RDS audit log reads:
@@ -43,6 +62,34 @@ Query params:
 - `entityId`
 
 Audit log reads are themselves written as `AUDIT_LOG_READ`.
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "audit_123",
+      "actorId": "user_123",
+      "lockerId": "locker_123",
+      "action": "BOOKING_UPDATE_STATUS",
+      "entityType": "Booking",
+      "entityId": "booking_123",
+      "details": {
+        "previousStatus": "ACTIVE",
+        "nextStatus": "ENDED"
+      },
+      "createdAt": "2026-05-10T09:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
 
 ### CloudWatch Security Alerts
 
@@ -74,6 +121,39 @@ Urgent admin notifications are configured in AWS with:
 
 `MEDIUM` and `LOW` alerts are still readable through CloudWatch Logs Insights/admin API, but do not trigger the urgent email alarm.
 
+Response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "@timestamp": "2026-05-10T09:00:00.000Z",
+      "@logGroup": "/ecs/locker-backend",
+      "@logStream": "ecs/backend/123",
+      "severity": "HIGH",
+      "eventType": "AUTH_FORBIDDEN",
+      "source": "backend",
+      "environment": "production",
+      "correlationId": "corr_123",
+      "actorId": "user_123",
+      "reason": "Access denied",
+      "path": "/api/v1/admin/audit-logs"
+    }
+  ],
+  "meta": {
+    "source": "cloudwatch_logs_insights",
+    "queryId": "cw_query_123",
+    "logGroupNames": [
+      "/ecs/locker-backend"
+    ],
+    "limit": 50,
+    "from": "2026-05-09T09:00:00.000Z",
+    "to": "2026-05-10T09:00:00.000Z"
+  }
+}
+```
+
 ### More Specific GET Queries
 
 The backend now accepts filters and pagination on list endpoints.
@@ -82,15 +162,112 @@ Admin users:
 
 - `GET /api/v1/admin/users?role=USER&email=a&name=b&phone=5&includeDeleted=false&limit=50&skip=0`
 
+Response:
+
+```json
+[
+  {
+    "userId": "user_123",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+972500000000",
+    "role": "USER",
+    "isDeleted": false,
+    "createdAt": "2026-05-10T09:00:00.000Z"
+  }
+]
+```
+
+Pagination headers:
+
+- `x-total-count`
+- `x-limit`
+- `x-skip`
+
 Bookings:
 
 - `GET /api/v1/bookings/admin?status=ACTIVE&userId=...&stationId=...&lockerBoxId=...&from=...&to=...&limit=50&skip=0`
 - `GET /api/v1/bookings/my?status=ACTIVE&stationId=...&lockerBoxId=...&limit=50&skip=0`
 
+Admin response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "bookingId": "booking_123",
+      "userId": "user_123",
+      "stationId": "station_123",
+      "lockerBoxId": "locker_123",
+      "status": "ACTIVE",
+      "paymentStatus": "PAID",
+      "startTime": "2026-05-10T08:00:00.000Z",
+      "expectedEndTime": "2026-05-10T10:00:00.000Z",
+      "endTime": null,
+      "payments": []
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
+
+User `/my` response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "bookingId": "booking_123",
+      "paymentStatus": "PAID",
+      "bookingStatus": "ACTIVE",
+      "lockerStatus": "OCCUPIED",
+      "lockerBoxId": "locker_123",
+      "stationId": "station_123",
+      "startTime": "2026-05-10T08:00:00.000Z",
+      "expectedEndTime": "2026-05-10T10:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
+
 Cities:
 
 - `GET /api/v1/cities?code=TLV&name=Tel&limit=50&skip=0`
 - `GET /api/v1/cities/sd?code=TLV&name=Tel&limit=50&skip=0`
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "cityId": "city_123",
+      "code": "TLV",
+      "name": "Tel Aviv",
+      "isActive": true,
+      "createdAt": "2026-05-10T09:00:00.000Z",
+      "updatedAt": "2026-05-10T09:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
 
 Lockers and stations:
 
@@ -100,9 +277,83 @@ Lockers and stations:
 - `GET /api/v1/lockers/admin/stations?cityId=...&city=TLV&status=ACTIVE&limit=50&skip=0`
 - `GET /api/v1/lockers/oper/stations?cityId=...&city=TLV&status=ACTIVE&limit=50&skip=0`
 
+Locker boxes response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "lockerBoxId": "locker_123",
+      "stationId": "station_123",
+      "code": "A001",
+      "size": "M",
+      "status": "AVAILABLE",
+      "techStatus": "ACTIVE",
+      "isActive": true
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
+
+Stations response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "stationId": "station_123",
+      "cityId": "city_123",
+      "name": "Central Station",
+      "address": "Main street 1",
+      "status": "ACTIVE",
+      "latitude": 32.0853,
+      "longitude": 34.7818,
+      "isActive": true
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "skip": 0,
+    "total": 1
+  }
+}
+```
+
 Pricing:
 
 - `GET /api/v1/pricing?cityId=...&size=M&limit=50&skip=0`
+
+Response:
+
+```json
+[
+  {
+    "priceId": "price_123",
+    "cityId": "city_123",
+    "size": "M",
+    "pricePerHour": 10,
+    "city": {
+      "code": "TLV",
+      "name": "Tel Aviv"
+    },
+    "createdAt": "2026-05-10T09:00:00.000Z",
+    "updatedAt": "2026-05-10T09:00:00.000Z"
+  }
+]
+```
+
+Pagination headers:
+
+- `x-total-count`
+- `x-limit`
+- `x-skip`
 
 When `limit` is omitted, legacy endpoints keep their existing broad response behavior.
 
