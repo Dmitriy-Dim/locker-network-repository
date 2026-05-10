@@ -22,12 +22,11 @@ export default function MyBookingsPage() {
 
     const safeBookings = Array.isArray(bookings) ? bookings : [];
     const activeBookings: any[] = [];
-    const reservedBookings: any[] = [];
+    const reservedBookings: any[] = [];   // PENDING + не оплачен
     const actionRequiredBookings: any[] = [];
     const historyBookings: any[] = [];
 
     safeBookings.forEach((b: any) => {
-
         if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
             reservedBookings.push(b);
             return;
@@ -59,8 +58,9 @@ export default function MyBookingsPage() {
             }
             return;
         }
-
-        historyBookings.push(b);
+        if (b.bookingStatus !== 'ACTIVE') {
+            historyBookings.push(b);
+        }
     });
 
     const renderEmptyState = (type: 'active' | 'reserved' | 'action' | 'history') => {

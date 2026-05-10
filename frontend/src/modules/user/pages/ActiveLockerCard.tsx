@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi.ts";
 import { lockersApi } from "../../../api/lockersApi.ts";
 import { apiClient } from "../../../api/apiClient.ts";
+import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
 
@@ -83,9 +84,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         if (!bookingId) return;
         setIsRepaying(true);
         try {
-            const response = await apiClient.get(`/bookings/${bookingId}`);
-            const data = response.data?.data || response.data;
-            const paymentUrl = data?.paymentUrl;
+            const paymentUrl = getPaymentUrl(bookingId);
 
             if (paymentUrl) {
                 window.location.href = paymentUrl;
@@ -97,8 +96,6 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                     alert('Payment link is no longer available. Please start a new booking.');
                 }
             }
-        } catch (e: any) {
-            alert(`Could not retrieve payment link: ${e?.message ?? 'Unknown error'}`);
         } finally {
             setIsRepaying(false);
         }
@@ -109,6 +106,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         setIsCancelling(true);
         try {
             await apiClient.post(`/bookings/${bookingId}/cancel`);
+            removePaymentUrl(bookingId);
             queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
             setIsHidden(true);
         } catch (e: any) {
@@ -579,7 +577,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         </>
     );
 }
-
 
 export function HistoryLockerCard({ booking }: { booking: any }) {
     const stationId = booking.stationId;
