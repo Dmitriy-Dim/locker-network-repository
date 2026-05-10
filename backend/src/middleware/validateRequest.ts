@@ -22,7 +22,14 @@ export const validateRequest =
                 }) as ParsedRequestParts;
 
                 req.body = parsed.body ?? req.body;
-                req.params = parsed.params ?? req.params;
+                if (parsed.params !== undefined) {
+                    Object.defineProperty(req, "params", {
+                        value: parsed.params,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true,
+                    });
+                }
                 if (parsed.query !== undefined) {
                     Object.defineProperty(req, "query", {
                         value: parsed.query,
