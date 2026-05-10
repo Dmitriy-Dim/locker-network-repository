@@ -105,6 +105,34 @@
     {
       "key": "skip",
       "value": "0"
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "requestTimestamp",
+      "value": ""
+    },
+    {
+      "key": "expectedEndTime",
+      "value": ""
+    },
+    {
+      "key": "extendExpectedEndTime",
+      "value": ""
+    },
+    {
+      "key": "securitySource",
+      "value": "backend"
+    },
+    {
+      "key": "lastResponseJson",
+      "value": ""
     }
   ],
   "item": [
@@ -1511,7 +1539,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"stationId\": \"{{stationId}}\",\n  \"size\": \"M\",\n  \"expectedEndTime\": \"2026-04-23T12:00:00.000Z\"\n}"
+              "raw": "{\n  \"stationId\": \"{{stationId}}\",\n  \"size\": \"M\",\n  \"expectedEndTime\": \"{{expectedEndTime}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/init",
@@ -1649,7 +1677,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"expectedEndTime\": \"2026-04-23T15:00:00.000Z\"\n}"
+              "raw": "{\n  \"expectedEndTime\": \"{{extendExpectedEndTime}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/extend",
@@ -2253,6 +2281,87 @@
           }
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const now = Date.now();",
+          "const runId = pm.collectionVariables.get('runId') || `pm-${now}`;",
+          "pm.collectionVariables.set('runId', runId);",
+          "pm.collectionVariables.set('requestTimestamp', new Date(now).toISOString());",
+          "pm.collectionVariables.set('expectedEndTime', new Date(now + 2 * 60 * 60 * 1000).toISOString());",
+          "pm.collectionVariables.set('extendExpectedEndTime', new Date(now + 4 * 60 * 60 * 1000).toISOString());",
+          "pm.collectionVariables.set('clientRequestId', `${runId}-${pm.info.requestName.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`);",
+          "const currentIdempotencyKey = pm.collectionVariables.get('idempotencyKey');",
+          "if (!currentIdempotencyKey || currentIdempotencyKey === 'pm-demo-key-001') {",
+          "  pm.collectionVariables.set('idempotencyKey', runId);",
+          "}",
+          "if (!pm.collectionVariables.get('limit')) pm.collectionVariables.set('limit', '50');",
+          "if (!pm.collectionVariables.get('skip')) pm.collectionVariables.set('skip', '0');",
+          "if (!pm.collectionVariables.get('securitySource')) pm.collectionVariables.set('securitySource', 'backend');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "function setVar(name, value) {",
+          "  if (value === undefined || value === null || value === '') return;",
+          "  pm.collectionVariables.set(name, String(value));",
+          "  console.log(`Saved collection variable ${name}:`, value);",
+          "}",
+          "function firstObject(value) {",
+          "  if (Array.isArray(value)) return value.find((item) => item && typeof item === 'object');",
+          "  return value && typeof value === 'object' ? value : undefined;",
+          "}",
+          "function findDeep(value, keys, depth = 0) {",
+          "  if (!value || depth > 5) return undefined;",
+          "  if (Array.isArray(value)) {",
+          "    for (const item of value) {",
+          "      const found = findDeep(item, keys, depth + 1);",
+          "      if (found !== undefined && found !== null && found !== '') return found;",
+          "    }",
+          "    return undefined;",
+          "  }",
+          "  if (typeof value !== 'object') return undefined;",
+          "  for (const key of keys) {",
+          "    if (value[key] !== undefined && value[key] !== null && value[key] !== '') return value[key];",
+          "  }",
+          "  for (const nested of Object.values(value)) {",
+          "    const found = findDeep(nested, keys, depth + 1);",
+          "    if (found !== undefined && found !== null && found !== '') return found;",
+          "  }",
+          "  return undefined;",
+          "}",
+          "let body;",
+          "try { body = pm.response.json(); } catch (e) { body = undefined; }",
+          "const payload = body?.data ?? body;",
+          "const first = firstObject(payload);",
+          "setVar('correlationId', pm.response.headers.get('x-correlation-id'));",
+          "setVar('accessToken', findDeep(payload, ['accessToken', 'access_token', 'token']));",
+          "setVar('refreshToken', findDeep(payload, ['refreshToken', 'refresh_token']));",
+          "setVar('operationId', findDeep(payload, ['operationId']));",
+          "setVar('bookingId', findDeep(payload, ['bookingId']));",
+          "setVar('stationId', findDeep(payload, ['stationId']));",
+          "setVar('lockerBoxId', findDeep(payload, ['lockerBoxId']));",
+          "setVar('cityId', findDeep(payload, ['cityId']));",
+          "setVar('priceId', findDeep(payload, ['priceId', 'pricingId']));",
+          "setVar('entityId', findDeep(payload, ['entityId']));",
+          "setVar('userId', findDeep(payload, ['userId']));",
+          "if ((first?.role || payload?.role) === 'ADMIN') setVar('adminUserId', first?.userId || payload?.userId);",
+          "if (pm.info.requestName.toLowerCase().includes('city')) setVar('cityId', first?.cityId || first?.id || payload?.cityId || payload?.id);",
+          "if (pm.info.requestName.toLowerCase().includes('price')) setVar('priceId', first?.priceId || first?.id || payload?.priceId || payload?.id);",
+          "if (pm.info.requestName.toLowerCase().includes('station')) setVar('stationId', first?.stationId || first?.id || payload?.stationId || payload?.id);",
+          "if (pm.info.requestName.toLowerCase().includes('box')) setVar('lockerBoxId', first?.lockerBoxId || first?.id || payload?.lockerBoxId || payload?.id);",
+          "if (body !== undefined) pm.collectionVariables.set('lastResponseJson', JSON.stringify(body));"
+        ]
+      }
     }
   ]
 }
