@@ -14,24 +14,24 @@ import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi.ts";
 import { lockersApi } from "../../../api/lockersApi.ts";
-import { devicesApi } from "../../../api/devicesApi.ts";
+import { apiClient } from "../../../api/apiClient.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
 
 function ReservedLockerCard({ booking }: { booking: any }) {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const bookingId = booking.bookingId || booking.id;
     const stationId = booking.stationId;
     const lockerBoxId = booking.lockerBoxId;
 
     const [isHidden, setIsHidden] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [isRepaying, setIsRepaying] = useState(false);
 
     const expiresAt = booking.expiresAt
         ? new Date(booking.expiresAt).getTime()
-        : booking.createdAt
-            ? new Date(booking.createdAt).getTime() + 15 * 60 * 1000
-            : null;
+        : null;
 
     const [timeLeft, setTimeLeft] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
@@ -79,14 +79,28 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         || '???';
     const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
 
-    const handleRepay = () => {
-        if (booking.paymentUrl) {
-            window.location.href = booking.paymentUrl;
-            return;
-        }
-        // Когда бэкенд добавит repay endpoint — заменить здесь
-        if (stationId) {
-            window.location.href = `/stations/${stationId}`;
+    const handleRepay = async () => {
+        if (!bookingId) return;
+        setIsRepaying(true);
+        try {
+            const response = await apiClient.get(`/bookings/${bookingId}`);
+            const data = response.data?.data || response.data;
+            const paymentUrl = data?.paymentUrl;
+
+            if (paymentUrl) {
+                window.location.href = paymentUrl;
+            } else {
+
+                if (stationId) {
+                    navigate(`/stations/${stationId}`);
+                } else {
+                    alert('Payment link is no longer available. Please start a new booking.');
+                }
+            }
+        } catch (e: any) {
+            alert(`Could not retrieve payment link: ${e?.message ?? 'Unknown error'}`);
+        } finally {
+            setIsRepaying(false);
         }
     };
 
@@ -94,11 +108,18 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         if (!bookingId) return;
         setIsCancelling(true);
         try {
-            await devicesApi.cancelBooking(bookingId);
+            await apiClient.post(`/bookings/${bookingId}/cancel`);
             queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
             setIsHidden(true);
         } catch (e: any) {
-            alert(`Could not cancel: ${e?.message ?? 'Unknown error'}`);
+            const status = e?.response?.status;
+            const message = e?.response?.data?.error?.message ?? e?.message ?? 'Unknown error';
+            if (status === 500) {
+                console.error('Cancel returned 500 — likely a backend issue with PENDING booking cancel:', message);
+                alert('Cancellation is temporarily unavailable. Your reservation will expire automatically in 15 minutes.');
+            } else {
+                alert(`Could not cancel: ${message}`);
+            }
         } finally {
             setIsCancelling(false);
         }
@@ -132,6 +153,8 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                 </Box>
 
                 <Stack alignItems={{ xs: 'stretch', md: 'flex-end' }} spacing={2} sx={{ minWidth: { md: '320px' } }}>
+
+
                     {timeLeft && (
                         <Box sx={{
                             p: 2,
@@ -159,7 +182,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                         </Alert>
                     ) : (
                         <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block' }}>
-                            Complete payment to confirm your locker.
+                            Complete payment to confirm your locker. Link is valid for 30 minutes.
                         </Typography>
                     )}
 
@@ -167,8 +190,12 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                         {!isExpired && (
                             <Button
                                 variant="contained"
-                                startIcon={<PaymentIcon />}
+                                startIcon={isRepaying
+                                    ? <CircularProgress size={16} color="inherit" />
+                                    : <PaymentIcon />
+                                }
                                 onClick={handleRepay}
+                                disabled={isRepaying || isCancelling}
                                 sx={{
                                     flex: 1,
                                     bgcolor: '#f59e0b',
@@ -179,14 +206,14 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                                     '&:hover': { bgcolor: '#d97706' },
                                 }}
                             >
-                                Pay Now
+                                {isRepaying ? 'Loading...' : 'Pay Now'}
                             </Button>
                         )}
                         <Button
                             variant="outlined"
                             color="error"
                             onClick={handleCancel}
-                            disabled={isCancelling}
+                            disabled={isCancelling || isRepaying}
                             startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
                             sx={{
                                 flex: isExpired ? 1 : undefined,
@@ -204,9 +231,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
     );
 }
 
-
 export function ActiveLockerCard({ locker: booking }: { locker: any }) {
-
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -324,7 +349,11 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const handleCancel = async () => {
         if (!bookingId) return;
         try {
-            await cancelBookingDevice(bookingId);
+            if (booking.bookingStatus === 'ACTIVE') {
+                await apiClient.post(`/bookings/${bookingId}/end`);
+            } else {
+                await cancelBookingDevice(bookingId);
+            }
             queryClient.setQueryData(["my-bookings"], (oldData: any) => {
                 if (!oldData) return oldData;
                 if (Array.isArray(oldData)) return oldData.filter((b: any) => (b.bookingId || b.id) !== bookingId);
@@ -548,5 +577,87 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                 </DialogActions>
             </Dialog>
         </>
+    );
+}
+
+
+export function HistoryLockerCard({ booking }: { booking: any }) {
+    const stationId = booking.stationId;
+    const lockerBoxId = booking.lockerBoxId;
+
+    const { data: stationData } = useQuery({
+        queryKey: ['station-details', stationId],
+        queryFn: () => stationsApi.getStationById(stationId!),
+        enabled: !!stationId && !booking.station?.address,
+        staleTime: 5 * 60_000,
+    });
+
+    const { data: lockerData } = useQuery({
+        queryKey: ['locker-details', lockerBoxId],
+        queryFn: () => lockersApi.getLockerById(lockerBoxId!),
+        enabled: !!lockerBoxId && !booking.size,
+        staleTime: 5 * 60_000,
+    });
+
+    const address = booking.station?.address || stationData?.address
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+    const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
+        || lockerBoxId?.slice(-4).toUpperCase() || '???';
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
+
+    const statusLabel: Record<string, string> = {
+        CANCELLED: 'Cancelled',
+        COMPLETED: 'Completed',
+        ENDED: 'Ended',
+        EXPIRED: 'Expired',
+        PAYMENT_CONFIRMED: 'Payment confirmed',
+    };
+    const label = statusLabel[booking.bookingStatus] ?? booking.bookingStatus ?? 'Unknown';
+
+    const statusColor: Record<string, string> = {
+        CANCELLED: '#dc2626',
+        COMPLETED: '#16a34a',
+        ENDED: '#16a34a',
+        EXPIRED: '#b45309',
+        PAYMENT_CONFIRMED: '#2563eb',
+    };
+    const borderColor = statusColor[booking.bookingStatus] ?? '#94a3b8';
+
+    const endDateStr = booking.expectedEndTime
+        ? new Date(booking.expectedEndTime).toLocaleDateString([], { dateStyle: 'medium' })
+        : null;
+
+    return (
+        <Paper sx={{
+            p: 3,
+            borderRadius: 4,
+            borderLeft: `6px solid ${borderColor}`,
+            mb: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            opacity: 0.85,
+        }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
+                <Box>
+                    <Typography variant="h5" fontWeight={800} color="#1e293b">
+                        Locker #{lockerCode}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
+                        <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                        <Typography variant="body2" color="text.secondary" fontWeight={600}>{address}</Typography>
+                    </Stack>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Chip label={label.toUpperCase()} size="small"
+                          sx={{ fontWeight: 700, bgcolor: `${borderColor}18`, color: borderColor, border: `1px solid ${borderColor}40` }}
+                    />
+                    <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                    {endDateStr && (
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            until {endDateStr}
+                        </Typography>
+                    )}
+                </Stack>
+            </Stack>
+        </Paper>
     );
 }

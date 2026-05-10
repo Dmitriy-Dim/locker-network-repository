@@ -8,7 +8,7 @@ import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HistoryIcon from '@mui/icons-material/History';
 import PaymentIcon from '@mui/icons-material/Payment';
-import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
+import { ActiveLockerCard, HistoryLockerCard } from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
 
@@ -27,29 +27,40 @@ export default function MyBookingsPage() {
     const historyBookings: any[] = [];
 
     safeBookings.forEach((b: any) => {
-       if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
+
+        if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
             reservedBookings.push(b);
             return;
         }
 
-        if (b.bookingStatus === "COMPLETED" || b.bookingStatus === "CANCELLED") {
-            historyBookings.push(b);
-            return;
-        }
-
-        const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
-        const isTimeExpired = endTime !== null && endTime <= now;
-        const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
-
-        if (b.bookingStatus === "EXPIRED" || isTimeExpired) {
+        if (b.bookingStatus === 'ACTIVE') {
+            const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
+            const isTimeExpired = endTime !== null && endTime <= now;
+            if (!isTimeExpired) {
+                activeBookings.push(b);
+                return;
+            }
+            const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
             if (isExpiredLongAgo) {
                 historyBookings.push(b);
             } else {
                 actionRequiredBookings.push(b);
             }
-        } else {
-            activeBookings.push(b);
+            return;
         }
+
+        if (b.bookingStatus === 'EXPIRED') {
+            const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
+            const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
+            if (isExpiredLongAgo) {
+                historyBookings.push(b);
+            } else {
+                actionRequiredBookings.push(b);
+            }
+            return;
+        }
+
+        historyBookings.push(b);
     });
 
     const renderEmptyState = (type: 'active' | 'reserved' | 'action' | 'history') => {
@@ -105,7 +116,6 @@ export default function MyBookingsPage() {
         );
     }
 
-
     const tabs = [
         { label: 'Active', list: activeBookings, emptyType: 'active' as const },
         { label: 'Reserved', list: reservedBookings, emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
@@ -146,9 +156,11 @@ export default function MyBookingsPage() {
 
             {currentTab.list.length > 0 ? (
                 <Stack spacing={2}>
-                    {currentTab.list.map((booking: any) => (
-                        <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
-                    ))}
+                    {currentTab.list.map((booking: any) =>
+                        tabIndex === 3
+                            ? <HistoryLockerCard key={booking.bookingId || booking.id} booking={booking} />
+                            : <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
+                    )}
                 </Stack>
             ) : (
                 renderEmptyState(currentTab.emptyType)
