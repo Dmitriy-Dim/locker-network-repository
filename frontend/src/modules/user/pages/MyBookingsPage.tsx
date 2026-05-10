@@ -22,11 +22,12 @@ export default function MyBookingsPage() {
 
     const safeBookings = Array.isArray(bookings) ? bookings : [];
     const activeBookings: any[] = [];
-    const reservedBookings: any[] = [];   // PENDING + не оплачен
+    const reservedBookings: any[] = [];
     const actionRequiredBookings: any[] = [];
     const historyBookings: any[] = [];
 
     safeBookings.forEach((b: any) => {
+
         if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
             reservedBookings.push(b);
             return;
@@ -39,12 +40,8 @@ export default function MyBookingsPage() {
                 activeBookings.push(b);
                 return;
             }
-            const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
-            if (isExpiredLongAgo) {
-                historyBookings.push(b);
-            } else {
-                actionRequiredBookings.push(b);
-            }
+
+            actionRequiredBookings.push(b);
             return;
         }
 
@@ -58,6 +55,7 @@ export default function MyBookingsPage() {
             }
             return;
         }
+
         if (b.bookingStatus !== 'ACTIVE') {
             historyBookings.push(b);
         }

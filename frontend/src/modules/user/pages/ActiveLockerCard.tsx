@@ -18,7 +18,6 @@ import { apiClient } from "../../../api/apiClient.ts";
 import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
-
 function ReservedLockerCard({ booking }: { booking: any }) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -29,6 +28,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
     const [isHidden, setIsHidden] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
     const [isRepaying, setIsRepaying] = useState(false);
+
 
     const expiresAt = booking.expiresAt
         ? new Date(booking.expiresAt).getTime()
@@ -80,6 +80,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         || '???';
     const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
 
+
     const handleRepay = async () => {
         if (!bookingId) return;
         setIsRepaying(true);
@@ -89,7 +90,6 @@ function ReservedLockerCard({ booking }: { booking: any }) {
             if (paymentUrl) {
                 window.location.href = paymentUrl;
             } else {
-
                 if (stationId) {
                     navigate(`/stations/${stationId}`);
                 } else {
@@ -110,14 +110,8 @@ function ReservedLockerCard({ booking }: { booking: any }) {
             queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
             setIsHidden(true);
         } catch (e: any) {
-            const status = e?.response?.status;
             const message = e?.response?.data?.error?.message ?? e?.message ?? 'Unknown error';
-            if (status === 500) {
-                console.error('Cancel returned 500 — likely a backend issue with PENDING booking cancel:', message);
-                alert('Cancellation is temporarily unavailable. Your reservation will expire automatically in 15 minutes.');
-            } else {
-                alert(`Could not cancel: ${message}`);
-            }
+            alert(`Could not cancel: ${message}`);
         } finally {
             setIsCancelling(false);
         }
@@ -204,7 +198,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                                     '&:hover': { bgcolor: '#d97706' },
                                 }}
                             >
-                                {isRepaying ? 'Loading...' : 'Pay Now'}
+                                {isRepaying ? 'Loading...' : 'Repay'}
                             </Button>
                         )}
                         <Button
@@ -306,7 +300,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         const timer = setInterval(updateTimer, 1000);
         return () => clearInterval(timer);
     }, [booking.expectedEndTime]);
-
     if (booking.bookingStatus === 'PENDING' && booking.paymentStatus === 'PENDING') {
         return <ReservedLockerCard booking={booking} />;
     }
