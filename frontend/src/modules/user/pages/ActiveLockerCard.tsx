@@ -9,13 +9,204 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import LockIcon from '@mui/icons-material/Lock';
+import PaymentIcon from '@mui/icons-material/Payment';
+import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi.ts";
 import { lockersApi } from "../../../api/lockersApi.ts";
+import { devicesApi } from "../../../api/devicesApi.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
 
+function ReservedLockerCard({ booking }: { booking: any }) {
+    const queryClient = useQueryClient();
+    const bookingId = booking.bookingId || booking.id;
+    const stationId = booking.stationId;
+    const lockerBoxId = booking.lockerBoxId;
+
+    const [isHidden, setIsHidden] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
+
+    const expiresAt = booking.expiresAt
+        ? new Date(booking.expiresAt).getTime()
+        : booking.createdAt
+            ? new Date(booking.createdAt).getTime() + 15 * 60 * 1000
+            : null;
+
+    const [timeLeft, setTimeLeft] = useState<string | null>(null);
+    const [isExpired, setIsExpired] = useState(false);
+
+    const { data: stationData } = useQuery({
+        queryKey: ['station-details', stationId],
+        queryFn: () => stationsApi.getStationById(stationId!),
+        enabled: !!stationId && !booking.station?.address,
+        staleTime: 60_000,
+    });
+
+    const { data: lockerData } = useQuery({
+        queryKey: ['locker-details', lockerBoxId],
+        queryFn: () => lockersApi.getLockerById(lockerBoxId!),
+        enabled: !!lockerBoxId && !booking.size,
+        staleTime: 60_000,
+    });
+
+    useEffect(() => {
+        if (!expiresAt) return;
+        const update = () => {
+            const diff = expiresAt - Date.now();
+            if (diff <= 0) {
+                setIsExpired(true);
+                setTimeLeft('Expired');
+            } else {
+                const m = Math.floor(diff / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                setTimeLeft(`${m}m ${s.toString().padStart(2, '0')}s`);
+                setIsExpired(false);
+            }
+        };
+        update();
+        const t = setInterval(update, 1000);
+        return () => clearInterval(t);
+    }, [expiresAt]);
+
+    const address = booking.station?.address
+        || stationData?.address
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+    const lockerCode = booking.code
+        || booking.lockerBox?.code
+        || lockerData?.code
+        || lockerBoxId?.slice(-4).toUpperCase()
+        || '???';
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
+
+    const handleRepay = () => {
+        if (booking.paymentUrl) {
+            window.location.href = booking.paymentUrl;
+            return;
+        }
+        // Когда бэкенд добавит repay endpoint — заменить здесь
+        if (stationId) {
+            window.location.href = `/stations/${stationId}`;
+        }
+    };
+
+    const handleCancel = async () => {
+        if (!bookingId) return;
+        setIsCancelling(true);
+        try {
+            await devicesApi.cancelBooking(bookingId);
+            queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+            setIsHidden(true);
+        } catch (e: any) {
+            alert(`Could not cancel: ${e?.message ?? 'Unknown error'}`);
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
+    if (isHidden) return null;
+
+    return (
+        <Paper sx={{
+            p: 4,
+            borderRadius: 4,
+            borderLeft: '10px solid #f59e0b',
+            mb: 2,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            bgcolor: '#fffbf0',
+        }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
+                <Box>
+                    <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
+                        <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                        <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                        <Chip
+                            label="RESERVED"
+                            sx={{ fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
+                        />
+                        <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                    </Stack>
+                </Box>
+
+                <Stack alignItems={{ xs: 'stretch', md: 'flex-end' }} spacing={2} sx={{ minWidth: { md: '320px' } }}>
+                    {timeLeft && (
+                        <Box sx={{
+                            p: 2,
+                            bgcolor: isExpired ? '#fef2f2' : '#fffbeb',
+                            borderRadius: 2,
+                            textAlign: 'center',
+                            border: `1px solid ${isExpired ? '#fecaca' : '#fde68a'}`,
+                            width: '100%',
+                        }}>
+                            <Stack direction="row" justifyContent="center" alignItems="center" spacing={1}>
+                                <HourglassTopIcon sx={{ color: isExpired ? '#dc2626' : '#b45309', fontSize: 18 }} />
+                                <Typography variant="caption" color={isExpired ? '#dc2626' : '#92400e'} fontWeight={700}>
+                                    {isExpired ? 'Reservation expired' : 'Reservation expires in:'}
+                                </Typography>
+                            </Stack>
+                            {!isExpired && (
+                                <Typography variant="h5" fontWeight={800} color="#b45309">{timeLeft}</Typography>
+                            )}
+                        </Box>
+                    )}
+
+                    {isExpired ? (
+                        <Alert severity="warning" sx={{ borderRadius: 2, width: '100%' }}>
+                            This reservation has expired. Please start a new booking.
+                        </Alert>
+                    ) : (
+                        <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block' }}>
+                            Complete payment to confirm your locker.
+                        </Typography>
+                    )}
+
+                    <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                        {!isExpired && (
+                            <Button
+                                variant="contained"
+                                startIcon={<PaymentIcon />}
+                                onClick={handleRepay}
+                                sx={{
+                                    flex: 1,
+                                    bgcolor: '#f59e0b',
+                                    color: '#fff',
+                                    borderRadius: 2,
+                                    fontWeight: 800,
+                                    textTransform: 'none',
+                                    '&:hover': { bgcolor: '#d97706' },
+                                }}
+                            >
+                                Pay Now
+                            </Button>
+                        )}
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={handleCancel}
+                            disabled={isCancelling}
+                            startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
+                            sx={{
+                                flex: isExpired ? 1 : undefined,
+                                borderRadius: 2,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                            }}
+                        >
+                            {isCancelling ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                    </Stack>
+                </Stack>
+            </Stack>
+        </Paper>
+    );
+}
+
+
 export function ActiveLockerCard({ locker: booking }: { locker: any }) {
+
     const queryClient = useQueryClient();
     const navigate = useNavigate();
 
@@ -31,6 +222,9 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     } = useDeviceOperation();
 
     const bookingId = booking.bookingId || booking.id;
+    const stationId = booking.stationId || booking.station?.id;
+    const lockerBoxId = booking.lockerBoxId || booking.lockerBox?.id;
+
     const isStuck = operationError?.result?.nextAction === 'CHANGE_LOCKER';
 
     const [isHidden, setIsHidden] = useState(() => {
@@ -49,59 +243,52 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         booking.expectedEndTime ? "active" : "noTime"
     );
 
-    // ==========================================
-    // СТЕЙТ ДЛЯ МОДАЛКИ ПРОДЛЕНИЯ (EXTEND)
-    // ==========================================
     const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
     const [extendDate, setExtendDate] = useState("");
     const [extendTime, setExtendTime] = useState("");
-
-    const handleOpenExtendModal = () => {
-        // По умолчанию предлагаем продлить на 1 час от текущего времени завершения
-        const currentEnd = booking.expectedEndTime ? new Date(booking.expectedEndTime) : new Date();
-        currentEnd.setHours(currentEnd.getHours() + 1);
-
-        const year = currentEnd.getFullYear();
-        const month = String(currentEnd.getMonth() + 1).padStart(2, '0');
-        const day = String(currentEnd.getDate()).padStart(2, '0');
-        setExtendDate(`${year}-${month}-${day}`);
-
-        const hours = String(currentEnd.getHours()).padStart(2, '0');
-        const minutes = String(currentEnd.getMinutes()).padStart(2, '0');
-        setExtendTime(`${hours}:${minutes}`);
-
-        setIsExtendModalOpen(true);
-    };
-
-    const handleConfirmExtend = async () => {
-        if (!extendDate || !extendTime) return;
-        const newEndTime = `${extendDate}T${extendTime}:00`;
-
-        try {
-            await extendBooking({ bookingId, endTime: new Date(newEndTime).toISOString() });
-            setIsExtendModalOpen(false);
-            // Если нужно, редирект сработает через useEffect в самом хуке, если лямбда вернет ссылку на оплату
-        } catch (error) {
-            console.error("Failed to extend booking:", error);
-            alert("Could not extend booking. Please try again.");
-        }
-    };
-    // ==========================================
-
-    const stationId = booking.stationId || booking.station?.id;
-    const lockerBoxId = booking.lockerBoxId || booking.lockerBox?.id;
 
     const { data: stationData } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
+        staleTime: 60_000,
     });
 
     const { data: lockerData } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
+        staleTime: 60_000,
     });
+
+    useEffect(() => {
+        if (!booking.expectedEndTime) return;
+        const updateTimer = () => {
+            const diff = new Date(booking.expectedEndTime).getTime() - Date.now();
+            if (diff <= -(8 * 60 * 60 * 1000)) {
+                setTimerStatus("heavilyOverdue");
+                setTimeLeft("Expired");
+            } else if (diff <= 0) {
+                setTimerStatus("expired");
+                setTimeLeft("Expired");
+            } else {
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                setTimeLeft(`${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`);
+                setTimerStatus("active");
+            }
+        };
+        updateTimer();
+        const timer = setInterval(updateTimer, 1000);
+        return () => clearInterval(timer);
+    }, [booking.expectedEndTime]);
+
+    if (booking.bookingStatus === 'PENDING' && booking.paymentStatus === 'PENDING') {
+        return <ReservedLockerCard booking={booking} />;
+    }
+
+    if (isHidden) return null;
 
     const address = booking.station?.address
         || stationData?.address
@@ -113,33 +300,26 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         || '???';
     const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
 
-    useEffect(() => {
-        if (!booking.expectedEndTime) return;
+    const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
-        const updateTimer = () => {
-            const diff = new Date(booking.expectedEndTime).getTime() - Date.now();
+    const handleOpenExtendModal = () => {
+        const currentEnd = booking.expectedEndTime ? new Date(booking.expectedEndTime) : new Date();
+        currentEnd.setHours(currentEnd.getHours() + 1);
+        setExtendDate(`${currentEnd.getFullYear()}-${String(currentEnd.getMonth() + 1).padStart(2, '0')}-${String(currentEnd.getDate()).padStart(2, '0')}`);
+        setExtendTime(`${String(currentEnd.getHours()).padStart(2, '0')}:${String(currentEnd.getMinutes()).padStart(2, '0')}`);
+        setIsExtendModalOpen(true);
+    };
 
-            if (diff <= -(8 * 60 * 60 * 1000)) {
-                setTimerStatus("heavilyOverdue");
-                setTimeLeft("Expired");
-            } else if (diff <= 0) {
-                setTimerStatus("expired");
-                setTimeLeft("Expired");
-            } else {
-                const h = Math.floor(diff / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                setTimeLeft(
-                    `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`
-                );
-                setTimerStatus("active");
-            }
-        };
-
-        updateTimer();
-        const timer = setInterval(updateTimer, 1000);
-        return () => clearInterval(timer);
-    }, [booking.expectedEndTime]);
+    const handleConfirmExtend = async () => {
+        if (!extendDate || !extendTime) return;
+        try {
+            await extendBooking({ bookingId, endTime: new Date(`${extendDate}T${extendTime}:00`).toISOString() });
+            setIsExtendModalOpen(false);
+        } catch (error) {
+            console.error("Failed to extend booking:", error);
+            alert("Could not extend booking. Please try again.");
+        }
+    };
 
     const handleCancel = async () => {
         if (!bookingId) return;
@@ -147,21 +327,15 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
             await cancelBookingDevice(bookingId);
             queryClient.setQueryData(["my-bookings"], (oldData: any) => {
                 if (!oldData) return oldData;
-                if (Array.isArray(oldData)) {
-                    return oldData.filter((b: any) => (b.bookingId || b.id) !== bookingId);
-                }
-                if (oldData.data && Array.isArray(oldData.data)) {
-                    return { ...oldData, data: oldData.data.filter((b: any) => (b.bookingId || b.id) !== bookingId) };
-                }
+                if (Array.isArray(oldData)) return oldData.filter((b: any) => (b.bookingId || b.id) !== bookingId);
+                if (oldData.data && Array.isArray(oldData.data)) return { ...oldData, data: oldData.data.filter((b: any) => (b.bookingId || b.id) !== bookingId) };
                 return oldData;
             });
-
             const canceledList = JSON.parse(localStorage.getItem('canceled_bookings') || '[]');
             if (!canceledList.includes(bookingId)) {
                 canceledList.push(bookingId);
                 localStorage.setItem('canceled_bookings', JSON.stringify(canceledList));
             }
-
             setIsHidden(true);
         } catch (error: any) {
             console.error("Cancel failed:", error?.response?.status, error?.message);
@@ -174,27 +348,16 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
             alert("System error: Missing station or locker information.");
             return;
         }
-
-        const devicePayload = {
-            bookingId: bookingId,
-            stationId: stationId,
-            lockerBoxId: lockerBoxId
-        };
-
         try {
             if (isLockerOpen) {
-                await closeLocker(devicePayload);
+                await closeLocker({ bookingId, stationId, lockerBoxId });
             } else {
-                await openLocker(devicePayload);
+                await openLocker({ bookingId, stationId, lockerBoxId });
             }
         } catch (error) {
             console.error("Device error:", error);
         }
     };
-
-    if (isHidden) return null;
-
-    const isActive = ['ACTIVE', 'PAID', 'PENDING'].includes(booking.bookingStatus);
 
     return (
         <>
@@ -210,7 +373,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                 boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
             }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
-
                     <Box>
                         <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
                         <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
@@ -228,7 +390,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                     </Box>
 
                     <Stack alignItems={{ xs: 'stretch', md: 'flex-end' }} spacing={2} sx={{ minWidth: { md: '350px' } }}>
-
                         {isStuck ? (
                             <Box sx={{ p: 2.5, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 2, textAlign: 'center', width: '100%' }}>
                                 <Typography variant="h4" mb={1}>😕</Typography>
@@ -242,9 +403,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                     variant="contained"
                                     color="error"
                                     fullWidth
-                                    onClick={() => {
-                                        navigate(`/stations/${stationId}`);
-                                    }}
+                                    onClick={() => navigate(`/stations/${stationId}`)}
                                     sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}
                                 >
                                     Book a new locker
@@ -260,9 +419,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
 
                                 {timerStatus === 'heavilyOverdue' && (
                                     <Alert severity="error" sx={{ borderRadius: 2 }}>
-                                        <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
-                                            Items moved to Lost & Found
-                                        </Typography>
+                                        <Typography variant="subtitle2" fontWeight={800} mb={0.5}>Items moved to Lost & Found</Typography>
                                         <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.4 }}>
                                             Your booking is more than 8 hours overdue. To retrieve your items, please contact support.
                                         </Typography>
@@ -311,16 +468,12 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                         <Stack direction="row" spacing={1} sx={{ width: '100%', pointerEvents: 'none' }}>
                                             <Button
                                                 variant="contained"
-                                                onClick={handleOpenExtendModal} // <-- Теперь открывает модалку
+                                                onClick={handleOpenExtendModal}
                                                 disabled={isWorking}
                                                 startIcon={<AccessTimeIcon />}
                                                 sx={{
-                                                    borderRadius: 2,
-                                                    fontWeight: 700,
-                                                    textTransform: 'none',
-                                                    flex: 1,
-                                                    bgcolor: '#3b82f6',
-                                                    '&:hover': { bgcolor: '#2563eb' },
+                                                    borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1,
+                                                    bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' },
                                                     pointerEvents: 'auto'
                                                 }}
                                             >
@@ -345,7 +498,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                 </Stack>
             </Paper>
 
-            {/* ВСПЛЫВАЮЩЕЕ ОКНО ПРОДЛЕНИЯ */}
             <Dialog
                 open={isExtendModalOpen}
                 onClose={() => setIsExtendModalOpen(false)}
@@ -382,10 +534,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button
-                        onClick={() => setIsExtendModalOpen(false)}
-                        sx={{ color: '#64748b', fontWeight: 700 }}
-                    >
+                    <Button onClick={() => setIsExtendModalOpen(false)} sx={{ color: '#64748b', fontWeight: 700 }}>
                         Cancel
                     </Button>
                     <Button

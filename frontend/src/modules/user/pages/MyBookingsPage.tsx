@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HistoryIcon from '@mui/icons-material/History';
+import PaymentIcon from '@mui/icons-material/Payment';
 import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
@@ -21,10 +22,16 @@ export default function MyBookingsPage() {
 
     const safeBookings = Array.isArray(bookings) ? bookings : [];
     const activeBookings: any[] = [];
+    const reservedBookings: any[] = [];
     const actionRequiredBookings: any[] = [];
     const historyBookings: any[] = [];
 
     safeBookings.forEach((b: any) => {
+       if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
+            reservedBookings.push(b);
+            return;
+        }
+
         if (b.bookingStatus === "COMPLETED" || b.bookingStatus === "CANCELLED") {
             historyBookings.push(b);
             return;
@@ -45,13 +52,17 @@ export default function MyBookingsPage() {
         }
     });
 
-    const renderEmptyState = (type: 'active' | 'action' | 'history') => {
+    const renderEmptyState = (type: 'active' | 'reserved' | 'action' | 'history') => {
         let message = "";
         let Icon = SentimentDissatisfiedIcon;
         let iconColor = "#94a3b8";
 
         if (type === 'active') {
             message = "No active bookings found";
+        } else if (type === 'reserved') {
+            message = "No pending payments.";
+            Icon = PaymentIcon;
+            iconColor = "#f59e0b";
         } else if (type === 'action') {
             message = "You're all caught up! No overdue bookings.";
             Icon = CheckCircleOutlineIcon;
@@ -94,11 +105,15 @@ export default function MyBookingsPage() {
         );
     }
 
-    const currentList = tabIndex === 0
-        ? activeBookings
-        : tabIndex === 1
-            ? actionRequiredBookings
-            : historyBookings;
+
+    const tabs = [
+        { label: 'Active', list: activeBookings, emptyType: 'active' as const },
+        { label: 'Reserved', list: reservedBookings, emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
+        { label: 'Action Required', list: actionRequiredBookings, emptyType: 'action' as const, badge: actionRequiredBookings.length > 0 },
+        { label: 'History', list: historyBookings, emptyType: 'history' as const },
+    ];
+
+    const currentTab = tabs[tabIndex];
 
     return (
         <Box sx={{ pt: '100px', px: 4, maxWidth: '900px', margin: '0 auto', pb: 10 }}>
@@ -110,31 +125,33 @@ export default function MyBookingsPage() {
                 sx={{ mb: 4, borderBottom: 1, borderColor: 'divider' }}
                 TabIndicatorProps={{ sx: { height: 3, borderRadius: '3px 3px 0 0' } }}
             >
-                <Tab label="Active" sx={{ fontWeight: 700, textTransform: 'none', fontSize: '1.05rem' }} />
-                <Tab
-                    label={
-                        <Badge
-                            color="error"
-                            variant="dot"
-                            invisible={actionRequiredBookings.length === 0}
-                            sx={{ '& .MuiBadge-badge': { right: -5, top: 0 } }}
-                        >
-                            Action Required
-                        </Badge>
-                    }
-                    sx={{ fontWeight: 700, textTransform: 'none', fontSize: '1.05rem' }}
-                />
-                <Tab label="History" sx={{ fontWeight: 700, textTransform: 'none', fontSize: '1.05rem' }} />
+                {tabs.map((tab, i) => (
+                    <Tab
+                        key={i}
+                        label={
+                            tab.badge ? (
+                                <Badge
+                                    color={tab.label === 'Reserved' ? 'warning' : 'error'}
+                                    variant="dot"
+                                    sx={{ '& .MuiBadge-badge': { right: -5, top: 0 } }}
+                                >
+                                    {tab.label}
+                                </Badge>
+                            ) : tab.label
+                        }
+                        sx={{ fontWeight: 700, textTransform: 'none', fontSize: '1.05rem' }}
+                    />
+                ))}
             </Tabs>
 
-            {currentList.length > 0 ? (
+            {currentTab.list.length > 0 ? (
                 <Stack spacing={2}>
-                    {currentList.map((booking: any) => (
+                    {currentTab.list.map((booking: any) => (
                         <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
                     ))}
                 </Stack>
             ) : (
-                renderEmptyState(tabIndex === 0 ? 'active' : tabIndex === 1 ? 'action' : 'history')
+                renderEmptyState(currentTab.emptyType)
             )}
         </Box>
     );
