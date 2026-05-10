@@ -23,7 +23,14 @@ export const validateRequest =
 
                 req.body = parsed.body ?? req.body;
                 req.params = parsed.params ?? req.params;
-                req.query = parsed.query ?? req.query;
+                if (parsed.query !== undefined) {
+                    Object.defineProperty(req, "query", {
+                        value: parsed.query,
+                        writable: true,
+                        enumerable: true,
+                        configurable: true,
+                    });
+                }
                 req.cookies = parsed.cookies ?? req.cookies;
 
                 next();
