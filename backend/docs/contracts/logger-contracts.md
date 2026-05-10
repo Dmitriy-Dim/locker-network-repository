@@ -1,104 +1,128 @@
-## Logger Contracts
+# Logger Contracts
 
-### SQS: Backend -> Lambda
+## CloudWatch: Backend -> Security Alert Pipeline
 
-#### Queue
+Backend alertable events are written to stdout as structured JSON. In ECS these records go to the backend CloudWatch Logs group and can be selected by a subscription filter. Alerts are not persisted to RDS.
 
-- Queue URL: `OPERATIONS_QUEUE_URL`
-- Transport: `AWS SQS`
-- Producer: `backend`
-- Consumer: `lambda command handler`
+### Subscription filter
 
-### Current command shape
+```text
+{ $.category = "SECURITY_ALERT" }
+```
 
-Backend currently sends security logs with the same queue envelope used for other async commands:
+### Current stdout shape
 
 ```json
 {
-  "operationId": "2ccf7a98-9272-4101-b6e0-9d93d0124d2f",
-  "type": "SECURITY_EVENT",
-  "payload": {
-    "eventId": "f5f1d0ad-9a6c-4b7b-a433-6dc7b01fd4c4",
-    "eventType": "AUTH_INVALID_TOKEN",
-    "occurredAt": "2026-04-13T12:45:00.000Z",
-    "actorId": "1f41bb7e-1ae6-4188-8f9e-13b694301234",
-    "correlationId": "corr-5dcf6e9a-1968-4d4c-8854-7240c9fa1234",
-    "ipAddress": "127.0.0.1",
-    "userAgent": "Mozilla/5.0",
-    "method": "GET",
-    "path": "/api/v1/auth/me",
-    "reason": "jwt expired",
-    "details": {
-      "requiredRoles": [
-        "ADMIN"
-      ]
-    }
+  "category": "SECURITY_ALERT",
+  "schemaVersion": 1,
+  "severity": "HIGH",
+  "eventId": "8a6cba2d-e1e5-4f0d-a69e-8fe3d8f3faaa",
+  "eventType": "AUTH_INVALID_TOKEN",
+  "occurredAt": "2026-05-10T04:00:00.000Z",
+  "source": "backend",
+  "environment": "production",
+  "actorId": "1f41bb7e-1ae6-4188-8f9e-13b694301234",
+  "correlationId": "corr-5dcf6e9a-1968-4d4c-8854-7240c9fa1234",
+  "ipAddress": "203.0.113.10",
+  "userAgent": "Mozilla/5.0",
+  "method": "GET",
+  "path": "/api/v1/auth/me",
+  "reason": "jwt expired",
+  "details": {
+    "requiredRoles": [
+      "ADMIN"
+    ]
   }
 }
 ```
 
 ### Required fields
 
-- `operationId`: queue command id
-- `type`: always `SECURITY_EVENT`
-- `payload.eventId`
-- `payload.eventType`
-- `payload.occurredAt`
-- `payload.correlationId`
-- `payload.method`
-- `payload.path`
-- `payload.reason`
+- `category`: always `SECURITY_ALERT`
+- `schemaVersion`
+- `severity`: `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`
+- `eventId`
+- `eventType`
+- `occurredAt`
+- `source`
+- `environment`
+- `reason`
 
 ### Optional fields
 
-- `payload.actorId`
-- `payload.ipAddress`
-- `payload.userAgent`
-- `payload.details`
+- `actorId`
+- `correlationId`
+- `ipAddress`
+- `userAgent`
+- `method`
+- `path`
+- `details`
 
-### Message attributes
+### Redaction
 
-SQS message attributes:
+Alert details must not include secrets, passwords, access tokens, refresh tokens, raw cookies, Authorization headers, or raw Stripe signatures.
 
-```json
-{
-  "type": {
-    "DataType": "String",
-    "StringValue": "SECURITY_EVENT"
-  }
-}
-```
+## AuditLog vs Security Alerts Ownership
 
-### Lambda behavior
+`AuditLog` and CloudWatch security alerts are separate signals and should not be treated as interchangeable logs.
 
-- Validate that `type === SECURITY_EVENT`
-- Parse `payload`
-- Write structured log to CloudWatch
-- Use `payload.eventType` for event classification
-- Use `payload.correlationId` for tracing
+### AuditLog
 
-### Current limitation
+Use `AuditLog` for business and administrative actions that describe who changed or accessed application state.
 
-`SECURITY_EVENT` currently uses the operations queue envelope but does not create a full initial operation item in the operations DynamoDB table before enqueue.
+Examples:
 
-### CloudWatch log example
+- Successful auth lifecycle events such as login, logout, register, and token refresh
+- Locker, station, city, pricing, booking, operation, and device actions
+- Admin role updates
+- Admin reads of audit logs
 
-```json
-{
-  "category": "SECURITY_LOG",
-  "operationId": "2ccf7a98-9272-4101-b6e0-9d93d0124d2f",
-  "eventId": "f5f1d0ad-9a6c-4b7b-a433-6dc7b01fd4c4",
-  "eventType": "AUTH_INVALID_TOKEN",
-  "correlationId": "corr-5dcf6e9a-1968-4d4c-8854-7240c9fa1234",
-  "path": "/api/v1/auth/me",
-  "method": "GET",
-  "actorId": "1f41bb7e-1ae6-4188-8f9e-13b694301234",
-  "reason": "jwt expired",
-  "details": {
-    "requiredRoles": [
-      "ADMIN"
-    ]
-  },
-  "occurredAt": "2026-04-13T12:45:00.000Z"
-}
-```
+`AuditLog` answers: who did what to which business entity, and when?
+
+### Security Alerts
+
+Use CloudWatch security alerts for threat, abuse, incident, and operational security signals.
+
+Examples:
+
+- Missing, invalid, expired, or reused tokens
+- Invalid credentials and unregistered-user auth attempts
+- Forbidden access attempts
+- Rate limit violations
+- Payment webhook anomalies
+- Internal errors, process failures, AWS/SQS/security pipeline failures
+- Privileged admin role changes
+
+Security alerts answer: what security-relevant event needs investigation, alerting, aggregation, or escalation?
+
+### Overlap rule
+
+Some sensitive events intentionally appear in both models, but with different semantics. For example, an admin role change is:
+
+- `AuditLog.USER_ROLE_UPDATE`: durable business audit of the role mutation
+- `SECURITY_ALERT.ADMIN_ROLE_CHANGE`: critical privileged-action signal for CloudWatch/SNS monitoring
+
+Do not duplicate every failed or suspicious request into `AuditLog` by default. Failed auth, forbidden access, rate limits, webhook signature failures, and infrastructure/security failures belong in CloudWatch security alerts unless they also changed business state or are explicitly required for compliance audit.
+
+## CloudWatch: Backend Security Alert Read Model
+
+Backend emits structured `SECURITY_ALERT` JSON logs to stdout. CloudWatch is the source of technical/security alerts for admin dashboard reads and operational investigation. Alerts are not duplicated into RDS.
+
+Admin endpoints:
+
+- `GET /api/v1/admin/security-alerts`
+- `GET /api/v1/admin/security-alerts/cloudwatch` legacy alias
+
+Supported filters:
+
+- `from`
+- `to`
+- `limit`
+- `severity`
+- `eventType`
+- `source`
+- `actorId`
+- `correlationId`
+
+CloudWatch read-through requires `CLOUDWATCH_LOG_GROUP_NAMES`.

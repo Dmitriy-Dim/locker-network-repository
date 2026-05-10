@@ -4,6 +4,13 @@
 
 - GET /api/v1/cities/
 
+Query params:
+
+- `code`
+- `name`
+- `limit`
+- `skip`
+
 URL example:
 ```
 {{baseUrl}}/api/v1/cities
@@ -32,6 +39,12 @@ Response example:
 
 
 ## Admin endpoints 
+
+### Soft-deleted cities
+
+- GET /api/v1/cities/sd
+- Roles: admin
+- Query params: `code`, `name`, `limit`, `skip`
 
 ### Create city
 

@@ -112,6 +112,31 @@ Response before payment:
 }
 ```
 
+### `GET /api/v1/operations/:id/events`
+
+Preferred read channel for operation completion. The old polling endpoint remains as fallback.
+
+Response content type:
+
+```text
+text/event-stream
+```
+
+Events:
+
+- `operation`: operation payload
+- `timeout`: stream timed out; frontend should fall back to `GET /operations/:id`
+- `error`: stream failed
+
+Example:
+
+```text
+event: operation
+data: {"operationId":"op_001","type":"BOOKING_INIT","status":"SUCCESS"}
+```
+
+Because the frontend stores access tokens in `localStorage`, use a fetch-based SSE client that can send `Authorization: Bearer <token>`. Native `EventSource` is not enough unless auth is moved to cookies.
+
 Response after payment confirmation and RDS finalization:
 
 ```json
@@ -161,6 +186,14 @@ Response:
 
 ### `GET /api/v1/bookings/my`
 
+Query params:
+
+- `status`
+- `stationId`
+- `lockerBoxId`
+- `limit`
+- `skip`
+
 Response:
 
 ```json
@@ -181,6 +214,21 @@ Response:
   ]
 }
 ```
+
+### Expiration Reconciliation
+
+Backend now owns RDS booking expiration as a background reconciliation job.
+
+Every `BOOKING_EXPIRATION_INTERVAL_MS`, backend scans `ACTIVE` RDS bookings with `expectedEndTime <= now` and:
+
+- sets booking status to `EXPIRED`
+- sets `endTime`
+- writes `AuditLog.BOOKING_EXPIRE`
+- does not change locker status or locker cache
+
+Lambda remains the owner of locker status/cache transitions caused by booking expiration.
+
+Lambda DynamoDB TTL cleanup remains responsible for Dynamo booking/cache state and must stay idempotent when backend has already expired the RDS row.
 
 ### `POST /api/v1/payments/webhook`
 
@@ -571,6 +619,30 @@ If the booking is already cancelled, backend returns `200 OK` with the current b
   }
 }
 ```
+
+### `POST /api/v1/bookings/:id/end`
+
+User or admin can end only an `ACTIVE` booking. Backend updates PostgreSQL status to `ENDED`, stores `endTime`, enqueues `LOCKER_CLOSE` with `finalizeBooking: true`, and returns:
+
+```json
+{
+  "success": true,
+  "status": "success",
+  "data": {
+    "operationId": "op_end_001",
+    "status": "PENDING",
+    "type": "LOCKER_CLOSE",
+    "bookingId": "bk_001",
+    "lockerBoxId": "locker_55",
+    "stationId": "station_123",
+    "persistedStatus": "ENDED",
+    "finalClose": true,
+    "message": "Booking end queued"
+  }
+}
+```
+
+If the booking is already ended, backend returns `200 OK`. For `PENDING`, `CANCELLED`, `EXPIRED`, or other non-active states backend returns `409`.
 
 ### `PATCH /api/v1/bookings/admin/:id/status`
 

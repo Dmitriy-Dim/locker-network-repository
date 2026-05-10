@@ -9,4 +9,5 @@ This folder contains API and contract documentation for the backend.
 - [pricing.md](./pricing.md) - pricing endpoints.
 - [bookings.md](./bookings.md) - booking API overview.
 - [openapi.json](./openapi.json) - Swagger/OpenAPI source used by Swagger UI.
+- [backend-v1.3-integration-notes.md](./backend-v1.3-integration-notes.md) - current backend changes and frontend/Lambda migration notes.
 - [contracts](./contracts/README.md) - SQS, DynamoDB, cache, booking, device, and logging contracts.

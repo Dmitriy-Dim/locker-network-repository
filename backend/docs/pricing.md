@@ -4,6 +4,8 @@
 
 - Roles: admin
 - Source: RDS
+- Query params: `cityId`, `size`, `limit`, `skip`
+- Pagination headers when present: `x-total-count`, `x-limit`, `x-skip`
 
 Example `200 OK` body:
 

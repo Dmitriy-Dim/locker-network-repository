@@ -428,10 +428,13 @@ Backend проверяет:
     "bookingId": "bk_001",
     "lockerBoxId": "locker_55",
     "stationId": "station_123",
+    "finalizeBooking": true,
     "requestedAt": "2026-04-29T10:03:00.000Z"
   }
 }
 ```
+
+`finalizeBooking` is sent by `POST /api/v1/bookings/:id/end`. When true, Lambda updates the DynamoDB booking status to `ENDED` after successful or idempotent locker close. Regular close commands omit this flag and do not finalize the booking.
 
 ### 5.5 Lambda simulation
 

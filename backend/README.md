@@ -189,6 +189,11 @@ FRONTEND_LOCAL_URL=http://localhost:5173
 USE_LAMBDA_HEALTH=false                 # true = call AWS Lambda first, fallback to DB check on error
 LAMBDA_HEALTH_URL=                      # Required when USE_LAMBDA_HEALTH=true
 
+# RDS booking expiration reconciliation
+BOOKING_EXPIRATION_DISABLED=false       # true disables backend expiration job
+BOOKING_EXPIRATION_INTERVAL_MS=60000    # how often backend scans expired ACTIVE bookings
+BOOKING_EXPIRATION_BATCH_SIZE=100       # max bookings processed per scan
+
 # AWS / async operations
 AWS_REGION=eu-west-1
 AWS_PROFILE=                            # Optional: local AWS profile name
@@ -251,6 +256,7 @@ npm run dev
 - Winston logging to console
 - Swagger UI available at `/docs`
 - Startup requires a reachable PostgreSQL instance and valid AWS credentials
+- Background booking expiration reconciliation starts automatically unless `BOOKING_EXPIRATION_DISABLED=true`
 
 Expected output:
 ```
@@ -258,6 +264,7 @@ Expected output:
 [INFO] PostgreSQL connected successfully
 [INFO] AWS credentials resolved successfully
 [INFO] App running at http://localhost:3555
+[INFO] Booking expiration job started
 ```
 
 ### Production
