@@ -95,6 +95,16 @@ async function loadBookingWithLockerStatus(bookingId: string) {
     };
 }
 
+const CANCELLABLE_BOOKING_STATUSES = new Set<string>([
+    BookingStatus.PENDING,
+    BookingStatus.ACTIVE,
+    BookingStatus.EXPIRED,
+]);
+
+function isCancellableBookingStatus(status: string) {
+    return CANCELLABLE_BOOKING_STATUSES.has(status);
+}
+
 export class BookingService {
     async initBooking(req: Request, res: Response) {
         return idempotencyService.execute(
@@ -448,26 +458,47 @@ export class BookingService {
             });
         }
 
+        if (!isCancellableBookingStatus(booking.status)) {
+            throw new HttpError(409, `Cannot cancel booking with status ${booking.status}`);
+        }
+
         if (!userId) {
             throw new HttpError(401, "Unauthorized");
         }
 
-        return idempotencyService.execute(
+        return idempotencyService.execute<Record<string, unknown>>(
             req,
             res,
             `booking-cancel:${bookingId}`,
             { bookingId },
             async () => {
                 const operationId = uuidv4();
+                let operationCreated = false;
 
                 try {
-                    const updated = await prismaService.booking.update({
+                    const existingRdsBooking = await prismaService.booking.findUnique({
                         where: { bookingId },
-                        data: {
-                            status: BookingStatus.CANCELLED,
-                            endTime: new Date(),
-                        },
                     });
+
+                    if (existingRdsBooking?.status === BookingStatus.CANCELLED) {
+                        return {
+                            statusCode: 200,
+                            body: {
+                                bookingId,
+                                bookingStatus: existingRdsBooking.status,
+                                lockerStatus,
+                                message: "Booking already cancelled",
+                            },
+                        };
+                    }
+
+                    if (existingRdsBooking && !isCancellableBookingStatus(existingRdsBooking.status)) {
+                        throw new HttpError(409, `Cannot cancel booking with status ${existingRdsBooking.status}`);
+                    }
+
+                    if (!existingRdsBooking && booking.status !== BookingStatus.PENDING) {
+                        throw new HttpError(409, "Booking is not finalized in RDS yet");
+                    }
 
                     await operationRepository.create({
                         operationId,
@@ -476,6 +507,17 @@ export class BookingService {
                         status: OperationStatus.PENDING,
                         type: OperationType.BOOKING_CANCEL,
                     });
+                    operationCreated = true;
+
+                    const updated = existingRdsBooking
+                        ? await prismaService.booking.update({
+                            where: { bookingId },
+                            data: {
+                                status: BookingStatus.CANCELLED,
+                                endTime: new Date(),
+                            },
+                        })
+                        : undefined;
 
                     await sendBookingCancelToQueue({
                         operationId,
@@ -509,15 +551,22 @@ export class BookingService {
                             OperationType.BOOKING_CANCEL,
                             {
                                 bookingId,
-                                persistedStatus: updated.status,
+                                requestedStatus: BookingStatus.CANCELLED,
+                                ...(updated ? { persistedStatus: updated.status } : {}),
                             },
                             "Booking cancellation queued"
                         ),
                     };
                 } catch (error) {
+                    if (error instanceof HttpError) {
+                        throw error;
+                    }
+
                     const errorMessage = error instanceof Error ? error.message : "Failed to queue booking cancel";
 
-                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    if (operationCreated) {
+                        await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    }
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_CANCEL_FAILED,
