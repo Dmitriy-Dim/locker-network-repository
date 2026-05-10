@@ -3,7 +3,7 @@
     "_postman_id": "9f9e1df0-3f3d-4f89-8426-a1be5b6cb9c1",
     "name": "Locker Backend Local",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Updated collection matching the routes currently mounted by the backend. Includes auth, cities, pricing, lockers/stations, bookings, payments, and device open/close commands."
+    "description": "Updated collection matching the current backend. Includes auth, filtered list GETs, operation SSE, RDS audit/security reads, bookings, payments, device commands, and admin/operator locker routes."
   },
   "variable": [
     {
@@ -65,6 +65,46 @@
     {
       "key": "clientRequestId",
       "value": "client-req-001"
+    },
+    {
+      "key": "auditAction",
+      "value": ""
+    },
+    {
+      "key": "entityType",
+      "value": ""
+    },
+    {
+      "key": "entityId",
+      "value": ""
+    },
+    {
+      "key": "securityEventType",
+      "value": ""
+    },
+    {
+      "key": "severity",
+      "value": ""
+    },
+    {
+      "key": "correlationId",
+      "value": ""
+    },
+    {
+      "key": "from",
+      "value": ""
+    },
+    {
+      "key": "to",
+      "value": ""
+    },
+    {
+      "key": "limit",
+      "value": "50"
+    },
+    {
+      "key": "skip",
+      "value": "0"
     }
   ],
   "item": [
@@ -153,6 +193,62 @@
               "path": [
                 "operations",
                 "{{operationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /operations/:id/events SSE",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/operations/{{operationId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "operations",
+                "{{operationId}}",
+                "events"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/operations/:id/events SSE",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/operations/{{operationId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "operations",
+                "{{operationId}}",
+                "events"
               ]
             }
           }
@@ -505,6 +601,48 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/v1/cities filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities?code={{cityCode}}&name=&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/cities/sd filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cities/sd?code={{cityCode}}&name=&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cities",
+                "sd"
+              ]
+            }
+          }
         }
       ]
     },
@@ -615,6 +753,44 @@
                 "lockers",
                 "stations",
                 "{{stationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/boxes filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/boxes?stationId={{stationId}}&size=S&status=AVAILABLE&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "boxes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/stations filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/stations?cityId={{cityId}}&city={{cityCode}}&status=ACTIVE&lat=&lng=&radius=&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "stations"
               ]
             }
           }
@@ -1234,6 +1410,81 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/v1/lockers/admin/boxes filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes?stationId={{stationId}}&city={{cityCode}}&code=&size=M&status=AVAILABLE&techStatus=ACTIVE&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "boxes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/admin/stations filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/stations?cityId={{cityId}}&city={{cityCode}}&status=ACTIVE&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "stations"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/lockers/oper/stations filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/oper/stations?cityId={{cityId}}&city={{cityCode}}&status=ACTIVE&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "oper",
+                "stations"
+              ]
+            }
+          }
         }
       ]
     },
@@ -1345,6 +1596,35 @@
                 "bookings",
                 "{{bookingId}}",
                 "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/bookings/:id/end",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-booking-end"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/end",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "end"
               ]
             }
           }
@@ -1468,6 +1748,54 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/v1/bookings/my filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/my?status=ACTIVE&stationId={{stationId}}&lockerBoxId={{lockerBoxId}}&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "my"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/bookings/admin filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/admin?status=ACTIVE&userId={{userId}}&stationId={{stationId}}&lockerBoxId={{lockerBoxId}}&from={{from}}&to={{to}}&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "admin"
+              ]
+            }
+          }
         }
       ]
     },
@@ -1540,6 +1868,103 @@
                 "admin",
                 "users",
                 "{{adminUserId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?role=USER&email=&name=&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/audit-logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/audit-logs?limit={{limit}}&skip={{skip}}&from={{from}}&to={{to}}&action={{auditAction}}&entityType={{entityType}}&entityId={{entityId}}&actorId={{userId}}&lockerId={{lockerBoxId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "audit-logs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/security-alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/security-alerts?limit={{limit}}&from={{from}}&to={{to}}&severity={{severity}}&eventType={{securityEventType}}&source={{securitySource}}&actorId={{userId}}&correlationId={{correlationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "security-alerts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/security-alerts/cloudwatch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/security-alerts/cloudwatch?limit={{limit}}&from={{from}}&to={{to}}&severity={{severity}}&eventType={{securityEventType}}&source={{securitySource}}&actorId={{userId}}&correlationId={{correlationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "security-alerts",
+                "cloudwatch"
               ]
             }
           }
@@ -1649,6 +2074,29 @@
                 "v1",
                 "pricing",
                 "{{priceId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/pricing filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pricing?cityId={{cityId}}&size=S&limit={{limit}}&skip={{skip}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing"
               ]
             }
           }

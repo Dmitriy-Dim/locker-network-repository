@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Locker Network API",
-    "version": "1.2.0",
-    "description": "Current API surface for the Locker Network backend. This spec reflects the routes mounted in backend/src/server.ts and the active Express routers, including pricing, city write routes, device commands, and operator locker routes.",
+    "version": "1.3.0",
+    "description": "Current API surface for the Locker Network backend. Includes operation SSE, RDS audit admin reads, CloudWatch security alert admin reads, filtered GET endpoints, RDS booking expiration reconciliation, pricing, city write routes, device commands, and operator locker routes.",
     "contact": {
       "name": "API Support",
       "email": "support@lockernetwork.com"
@@ -66,6 +66,14 @@
     {
       "name": "Devices",
       "description": "Locker device commands through SQS/Lambda"
+    },
+    {
+      "name": "Audit",
+      "description": "Admin RDS audit log reads"
+    },
+    {
+      "name": "Security Alerts",
+      "description": "Admin security alert reads from CloudWatch Logs Insights"
     }
   ],
   "components": {
@@ -106,6 +114,145 @@
         "name": "id",
         "in": "path",
         "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "LimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "description": "Optional page size. When omitted, legacy list endpoints may return the full filtered list."
+      },
+      "SkipQuery": {
+        "name": "skip",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "description": "Number of records to skip."
+      },
+      "FromQuery": {
+        "name": "from",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": "Inclusive start datetime."
+      },
+      "ToQuery": {
+        "name": "to",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": "Inclusive end datetime."
+      },
+      "RoleQuery": {
+        "name": "role",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "USER",
+            "OPERATOR",
+            "ADMIN"
+          ]
+        }
+      },
+      "BookingStatusQuery": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/BookingStatus"
+        }
+      },
+      "StationStatusQuery": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/StationStatus"
+        }
+      },
+      "LockerStatusQuery": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/LockerStatus"
+        }
+      },
+      "LockerTechStatusQuery": {
+        "name": "techStatus",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/TechnicalStatus"
+        }
+      },
+      "LockerSizeQuery": {
+        "name": "size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/LockerSize"
+        }
+      },
+      "CityIdQuery": {
+        "name": "cityId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CityQuery": {
+        "name": "city",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "City code or city name depending on endpoint."
+      },
+      "StationIdQuery": {
+        "name": "stationId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "LockerBoxIdQuery": {
+        "name": "lockerBoxId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "UserIdQuery": {
+        "name": "userId",
+        "in": "query",
+        "required": false,
         "schema": {
           "type": "string",
           "format": "uuid"
@@ -1000,6 +1147,132 @@
             "example": "oper-open-001"
           }
         }
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "lockerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityAlert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "method": {
+            "type": "string",
+            "nullable": true
+          },
+          "path": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "SseOperationEvent": {
+        "type": "object",
+        "description": "SSE event payload sent as event: operation with JSON data.",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "SUCCESS",
+              "FAILED"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          }
+        }
       }
     },
     "responses": {
@@ -1374,6 +1647,50 @@
         }
       }
     },
+    "/api/v1/bookings/{id}/end": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "End active booking and close locker",
+        "description": "Updates PostgreSQL booking status to ENDED, queues LOCKER_CLOSE with finalizeBooking=true, and returns the operation id.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking already ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Booking end queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Booking is not ACTIVE"
+          }
+        }
+      }
+    },
     "/api/v1/bookings/{id}/extend": {
       "post": {
         "tags": [
@@ -1440,7 +1757,33 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerBoxIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/StationIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       }
     },
     "/api/v1/bookings/admin/{id}": {
@@ -1583,7 +1926,24 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerBoxIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/StationIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       }
     },
     "/api/v1/cities": {
@@ -1603,7 +1963,29 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -1864,7 +2246,29 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       }
     },
     "/api/v1/cities/sd/{id}": {
@@ -2323,7 +2727,37 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/StationIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/CityQuery"
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LockerSizeQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerTechStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -2574,7 +3008,24 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CityIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/CityQuery"
+          },
+          {
+            "$ref": "#/components/parameters/StationStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -2744,6 +3195,12 @@
             "schema": {
               "$ref": "#/components/schemas/LockerStatus"
             }
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
           }
         ],
         "responses": {
@@ -2969,7 +3426,24 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CityIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/CityQuery"
+          },
+          {
+            "$ref": "#/components/parameters/StationStatusQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ]
       }
     },
     "/api/v1/lockers/oper/stations/{id}": {
@@ -3189,6 +3663,15 @@
             "schema": {
               "$ref": "#/components/schemas/StationStatus"
             }
+          },
+          {
+            "$ref": "#/components/parameters/CityIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
           }
         ],
         "responses": {
@@ -3320,6 +3803,18 @@
             "schema": {
               "$ref": "#/components/schemas/LockerSize"
             }
+          },
+          {
+            "$ref": "#/components/parameters/CityIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerSizeQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
           }
         ],
         "responses": {
@@ -3658,6 +4153,510 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/operations/{id}/events": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Stream operation status with Server-Sent Events",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/event-stream with event: operation, timeout, or error",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: operation\\ndata: {\"operationId\":\"op_123\",\"status\":\"SUCCESS\"}\\n\\n"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "Audit",
+          "Admin"
+        ],
+        "summary": "List RDS audit logs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LockerBoxIdQuery"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/security-alerts": {
+      "get": {
+        "tags": [
+          "Security Alerts",
+          "Admin"
+        ],
+        "summary": "Query CloudWatch security alerts",
+        "description": "Reads SECURITY_ALERT structured logs from CloudWatch Logs Insights. Alerts are not duplicated into RDS.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/UserIdQuery"
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CloudWatch security alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/security-alerts/cloudwatch": {
+      "get": {
+        "tags": [
+          "Security Alerts",
+          "Admin"
+        ],
+        "summary": "Query CloudWatch security alerts",
+        "description": "Backward-compatible alias for /api/v1/admin/security-alerts.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/UserIdQuery"
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CloudWatch security alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List users for admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoleQuery"
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SkipQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/operations/health": {
+      "post": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Create health-check operation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "correlationId": "0d9f4f8f-0f31-4f4f-a38e-dafb2cb3d12d",
+                  "data": {
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "PENDING"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{id}": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Get operation status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current operation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "data": {
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "COMPLETED",
+                    "type": "HEALTH_CHECK",
+                    "timestamp": "2026-04-22T08:30:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{id}/events": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Stream operation status with Server-Sent Events",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/event-stream with event: operation, timeout, or error",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: operation\\ndata: {\"operationId\":\"op_123\",\"status\":\"SUCCESS\"}\\n\\n"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
