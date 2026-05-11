@@ -5,8 +5,8 @@ export function useMyBookings() {
     return useQuery({
         queryKey: ['my-bookings'],
         queryFn: bookingsApi.getMyBookings,
-        staleTime: 30_000,
-        gcTime: 5 * 60_000,
+        staleTime: 60_000,
+        gcTime: 10 * 60_000,
         refetchOnWindowFocus: false,
     });
 }

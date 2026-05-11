@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
     Box, Typography, Button, Stack, Paper, CircularProgress,
     Tabs, Tab, Badge
@@ -20,46 +20,53 @@ export default function MyBookingsPage() {
     const [tabIndex, setTabIndex] = useState(0);
     const [now] = useState(() => Date.now());
 
-    const safeBookings = Array.isArray(bookings) ? bookings : [];
-    const activeBookings: any[] = [];
-    const reservedBookings: any[] = [];
-    const actionRequiredBookings: any[] = [];
-    const historyBookings: any[] = [];
+    const { activeBookings, reservedBookings, actionRequiredBookings, historyBookings } = useMemo(() => {
+        const safeBookings = Array.isArray(bookings) ? bookings : [];
+        const active: any[] = [];
+        const reserved: any[] = [];
+        const action: any[] = [];
+        const history: any[] = [];
 
-    safeBookings.forEach((b: any) => {
-
-        if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
-            reservedBookings.push(b);
-            return;
-        }
-
-        if (b.bookingStatus === 'ACTIVE') {
-            const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
-            const isTimeExpired = endTime !== null && endTime <= now;
-            if (!isTimeExpired) {
-                activeBookings.push(b);
+        safeBookings.forEach((b: any) => {
+            if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
+                reserved.push(b);
                 return;
             }
 
-            actionRequiredBookings.push(b);
-            return;
-        }
-
-        if (b.bookingStatus === 'EXPIRED') {
-            const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
-            const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
-            if (isExpiredLongAgo) {
-                historyBookings.push(b);
-            } else {
-                actionRequiredBookings.push(b);
+            if (b.bookingStatus === 'ACTIVE') {
+                const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
+                const isTimeExpired = endTime !== null && endTime <= now;
+                if (!isTimeExpired) {
+                    active.push(b);
+                    return;
+                }
+                action.push(b);
+                return;
             }
-            return;
-        }
 
-        if (b.bookingStatus !== 'ACTIVE') {
-            historyBookings.push(b);
-        }
-    });
+            if (b.bookingStatus === 'EXPIRED') {
+                const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
+                const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
+                if (isExpiredLongAgo) {
+                    history.push(b);
+                } else {
+                    action.push(b);
+                }
+                return;
+            }
+
+            if (b.bookingStatus !== 'ACTIVE') {
+                history.push(b);
+            }
+        });
+
+        return {
+            activeBookings: active,
+            reservedBookings: reserved,
+            actionRequiredBookings: action,
+            historyBookings: history
+        };
+    }, [bookings, now]);
 
     const renderEmptyState = (type: 'active' | 'reserved' | 'action' | 'history') => {
         let message = "";
@@ -106,6 +113,13 @@ export default function MyBookingsPage() {
         );
     };
 
+    const tabs = useMemo(() => [
+        { label: 'Active', list: activeBookings, emptyType: 'active' as const },
+        { label: 'Reserved', list: reservedBookings, emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
+        { label: 'Action Required', list: actionRequiredBookings, emptyType: 'action' as const, badge: actionRequiredBookings.length > 0 },
+        { label: 'History', list: historyBookings, emptyType: 'history' as const },
+    ], [activeBookings, reservedBookings, actionRequiredBookings, historyBookings]);
+
     if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', pt: 20 }}>
@@ -113,13 +127,6 @@ export default function MyBookingsPage() {
             </Box>
         );
     }
-
-    const tabs = [
-        { label: 'Active', list: activeBookings, emptyType: 'active' as const },
-        { label: 'Reserved', list: reservedBookings, emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
-        { label: 'Action Required', list: actionRequiredBookings, emptyType: 'action' as const, badge: actionRequiredBookings.length > 0 },
-        { label: 'History', list: historyBookings, emptyType: 'history' as const },
-    ];
 
     const currentTab = tabs[tabIndex];
 
@@ -152,17 +159,19 @@ export default function MyBookingsPage() {
                 ))}
             </Tabs>
 
-            {currentTab.list.length > 0 ? (
-                <Stack spacing={2}>
-                    {currentTab.list.map((booking: any) =>
-                        tabIndex === 3
-                            ? <HistoryLockerCard key={booking.bookingId || booking.id} booking={booking} />
-                            : <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
-                    )}
-                </Stack>
-            ) : (
-                renderEmptyState(currentTab.emptyType)
-            )}
+            <Box sx={{ minHeight: '400px' }}>
+                {currentTab.list.length > 0 ? (
+                    <Stack spacing={2}>
+                        {currentTab.list.map((booking: any) =>
+                            tabIndex === 3
+                                ? <HistoryLockerCard key={booking.bookingId || booking.id} booking={booking} />
+                                : <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
+                        )}
+                    </Stack>
+                ) : (
+                    renderEmptyState(currentTab.emptyType)
+                )}
+            </Box>
         </Box>
     );
 }

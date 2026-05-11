@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Paper, Box, Typography, Stack, Chip, Button, Alert, CircularProgress,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField, Skeleton
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -17,6 +17,8 @@ import { lockersApi } from "../../../api/lockersApi.ts";
 import { apiClient } from "../../../api/apiClient.ts";
 import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking.ts";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
+
+const STALE_TIME_EXTENDED = 5 * 60_000;
 
 function ReservedLockerCard({ booking }: { booking: any }) {
     const queryClient = useQueryClient();
@@ -37,18 +39,18 @@ function ReservedLockerCard({ booking }: { booking: any }) {
     const [timeLeft, setTimeLeft] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
 
-    const { data: stationData } = useQuery({
+    const { data: stationData, isLoading: isStationLoading } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
-        staleTime: 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
-    const { data: lockerData } = useQuery({
+    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
-        staleTime: 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
     useEffect(() => {
@@ -70,15 +72,18 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         return () => clearInterval(t);
     }, [expiresAt]);
 
+    const isLoading = isStationLoading || isLockerLoading;
+
     const address = booking.station?.address
         || stationData?.address
-        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
+
     const lockerCode = booking.code
         || booking.lockerBox?.code
         || lockerData?.code
-        || lockerBoxId?.slice(-4).toUpperCase()
-        || '???';
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
+        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
+
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
 
 
     const handleRepay = async () => {
@@ -127,20 +132,29 @@ function ReservedLockerCard({ booking }: { booking: any }) {
             mb: 2,
             boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
             bgcolor: '#fffbf0',
+            minHeight: '180px'
         }}>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
-                <Box>
-                    <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
+                <Box sx={{ flex: 1 }}>
+                    <Typography variant="h3" fontWeight={900}>
+                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
+                    </Typography>
                     <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
+                        <Typography color="text.secondary" fontWeight={600}>
+                            {address || <Skeleton width={250} />}
+                        </Typography>
                     </Stack>
                     <Stack direction="row" spacing={1}>
                         <Chip
                             label="RESERVED"
                             sx={{ fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
                         />
-                        <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                        {size ? (
+                            <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                        ) : (
+                            <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
+                        )}
                     </Stack>
                 </Box>
 
@@ -264,18 +278,18 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const [extendDate, setExtendDate] = useState("");
     const [extendTime, setExtendTime] = useState("");
 
-    const { data: stationData } = useQuery({
+    const { data: stationData, isLoading: isStationLoading } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
-        staleTime: 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
-    const { data: lockerData } = useQuery({
+    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
-        staleTime: 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
     useEffect(() => {
@@ -300,21 +314,25 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         const timer = setInterval(updateTimer, 1000);
         return () => clearInterval(timer);
     }, [booking.expectedEndTime]);
+
     if (booking.bookingStatus === 'PENDING' && booking.paymentStatus === 'PENDING') {
         return <ReservedLockerCard booking={booking} />;
     }
 
     if (isHidden) return null;
 
+    const isLoading = isStationLoading || isLockerLoading;
+
     const address = booking.station?.address
         || stationData?.address
-        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
+
     const lockerCode = booking.code
         || booking.lockerBox?.code
         || lockerData?.code
-        || lockerBoxId?.slice(-4).toUpperCase()
-        || '???';
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
+        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
+
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
 
     const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
@@ -391,13 +409,18 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                         : '10px solid #2e7d32',
                 mb: 2,
                 boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+                minHeight: '220px'
             }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
-                    <Box>
-                        <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
+                    <Box sx={{ flex: 1 }}>
+                        <Typography variant="h3" fontWeight={900}>
+                            {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
+                        </Typography>
                         <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
                             <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                            <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
+                            <Typography color="text.secondary" fontWeight={600}>
+                                {address || <Skeleton width={250} />}
+                            </Typography>
                         </Stack>
                         <Stack direction="row" spacing={1}>
                             <Chip
@@ -405,7 +428,11 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                 color={timerStatus === 'heavilyOverdue' ? "error" : isActive ? "success" : "warning"}
                                 sx={{ fontWeight: 700 }}
                             />
-                            <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                            {size ? (
+                                <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                            ) : (
+                                <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
+                            )}
                         </Stack>
                     </Box>
 
@@ -575,25 +602,27 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
     const stationId = booking.stationId;
     const lockerBoxId = booking.lockerBoxId;
 
-    const { data: stationData } = useQuery({
+    const { data: stationData, isLoading: isStationLoading } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
-        staleTime: 5 * 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
-    const { data: lockerData } = useQuery({
+    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
-        staleTime: 5 * 60_000,
+        staleTime: STALE_TIME_EXTENDED,
     });
 
+    const isLoading = isStationLoading || isLockerLoading;
+
     const address = booking.station?.address || stationData?.address
-        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
     const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
-        || lockerBoxId?.slice(-4).toUpperCase() || '???';
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
+        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
 
     const statusLabel: Record<string, string> = {
         CANCELLED: 'Cancelled',
@@ -625,22 +654,29 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
             mb: 2,
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             opacity: 0.85,
+            minHeight: '80px'
         }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
-                <Box>
+                <Box sx={{ flex: 1 }}>
                     <Typography variant="h5" fontWeight={800} color="#1e293b">
-                        Locker #{lockerCode}
+                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={120} />}
                     </Typography>
                     <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-                        <Typography variant="body2" color="text.secondary" fontWeight={600}>{address}</Typography>
+                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                            {address || <Skeleton width={200} />}
+                        </Typography>
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Chip label={label.toUpperCase()} size="small"
                           sx={{ fontWeight: 700, bgcolor: `${borderColor}18`, color: borderColor, border: `1px solid ${borderColor}40` }}
                     />
-                    <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                    {size ? (
+                        <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                    ) : (
+                        <Skeleton variant="rounded" width={60} height={24} sx={{ borderRadius: 4 }} />
+                    )}
                     {endDateStr && (
                         <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                             until {endDateStr}
