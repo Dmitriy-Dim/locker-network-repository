@@ -12,3 +12,9 @@ export const adminUsersQuerySchema = z.object({
         skip: z.coerce.number().int().nonnegative().optional(),
     }),
 });
+
+export const userIdQuerySchema = z.object({
+    params: z.object({
+        id: z.string().uuid(),
+    })
+})
