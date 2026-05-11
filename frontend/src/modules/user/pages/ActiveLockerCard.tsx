@@ -744,7 +744,7 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Chip
-                            label={booking.bookingStatus || 'EXPIRED'}
+                            label={isHeavilyOverdue ? 'ITEMS MOVED' : (booking.bookingStatus || 'EXPIRED')}
                             sx={{
                                 fontWeight: 700,
                                 bgcolor: isHeavilyOverdue ? '#fee2e2' : '#fef3c7',
