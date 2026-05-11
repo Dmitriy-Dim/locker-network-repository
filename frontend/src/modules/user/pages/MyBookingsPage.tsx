@@ -8,7 +8,7 @@ import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HistoryIcon from '@mui/icons-material/History';
 import PaymentIcon from '@mui/icons-material/Payment';
-import { ActiveLockerCard, HistoryLockerCard } from "./ActiveLockerCard.tsx";
+import {ActionRequiredLockerCard, ActiveLockerCard, HistoryLockerCard} from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
 
@@ -28,6 +28,7 @@ export default function MyBookingsPage() {
         const history: any[] = [];
 
         safeBookings.forEach((b: any) => {
+
             if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
                 reserved.push(b);
                 return;
@@ -38,9 +39,9 @@ export default function MyBookingsPage() {
                 const isTimeExpired = endTime !== null && endTime <= now;
                 if (!isTimeExpired) {
                     active.push(b);
-                    return;
+                } else {
+                    action.push(b);
                 }
-                action.push(b);
                 return;
             }
 
@@ -54,17 +55,14 @@ export default function MyBookingsPage() {
                 }
                 return;
             }
-
-            if (b.bookingStatus !== 'ACTIVE') {
-                history.push(b);
-            }
+            history.push(b);
         });
 
         return {
             activeBookings: active,
             reservedBookings: reserved,
             actionRequiredBookings: action,
-            historyBookings: history
+            historyBookings: history,
         };
     }, [bookings, now]);
 
@@ -114,10 +112,10 @@ export default function MyBookingsPage() {
     };
 
     const tabs = useMemo(() => [
-        { label: 'Active', list: activeBookings, emptyType: 'active' as const },
-        { label: 'Reserved', list: reservedBookings, emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
-        { label: 'Action Required', list: actionRequiredBookings, emptyType: 'action' as const, badge: actionRequiredBookings.length > 0 },
-        { label: 'History', list: historyBookings, emptyType: 'history' as const },
+        { label: 'Active',          list: activeBookings,         emptyType: 'active'   as const },
+        { label: 'Reserved',        list: reservedBookings,       emptyType: 'reserved' as const, badge: reservedBookings.length > 0 },
+        { label: 'Action Required', list: actionRequiredBookings, emptyType: 'action'   as const, badge: actionRequiredBookings.length > 0 },
+        { label: 'History',         list: historyBookings,        emptyType: 'history'  as const },
     ], [activeBookings, reservedBookings, actionRequiredBookings, historyBookings]);
 
     if (isLoading) {
@@ -162,11 +160,12 @@ export default function MyBookingsPage() {
             <Box sx={{ minHeight: '400px' }}>
                 {currentTab.list.length > 0 ? (
                     <Stack spacing={2}>
-                        {currentTab.list.map((booking: any) =>
-                            tabIndex === 3
-                                ? <HistoryLockerCard key={booking.bookingId || booking.id} booking={booking} />
-                                : <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
-                        )}
+                        {currentTab.list.map((booking: any) => {
+                            const key = booking.bookingId || booking.id;
+                            if (tabIndex === 2) return <ActionRequiredLockerCard key={key} booking={booking} />;
+                            if (tabIndex === 3) return <HistoryLockerCard key={key} booking={booking} />;
+                            return <ActiveLockerCard key={key} locker={booking} />;
+                        })}
                     </Stack>
                 ) : (
                     renderEmptyState(currentTab.emptyType)

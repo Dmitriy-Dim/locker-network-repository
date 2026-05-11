@@ -687,3 +687,114 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
         </Paper>
     );
 }
+export function ActionRequiredLockerCard({ booking }: { booking: any }) {
+    const stationId = booking.stationId;
+    const lockerBoxId = booking.lockerBoxId;
+    const [now] = useState(() => Date.now());
+
+    const { data: stationData, isLoading: isStationLoading } = useQuery({
+        queryKey: ['station-details', stationId],
+        queryFn: () => stationsApi.getStationById(stationId!),
+        enabled: !!stationId && !booking.station?.address,
+        staleTime: STALE_TIME_EXTENDED,
+    });
+
+    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
+        queryKey: ['locker-details', lockerBoxId],
+        queryFn: () => lockersApi.getLockerById(lockerBoxId!),
+        enabled: !!lockerBoxId && !booking.size,
+        staleTime: STALE_TIME_EXTENDED,
+    });
+
+    const isLoading = isStationLoading || isLockerLoading;
+
+    const address = booking.station?.address || stationData?.address
+        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
+    const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
+        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
+
+    const endTime = booking.expectedEndTime ? new Date(booking.expectedEndTime).getTime() : null;
+    const isHeavilyOverdue = endTime !== null && (now - endTime) > 8 * 60 * 60 * 1000;
+
+    const endDateStr = booking.expectedEndTime
+        ? new Date(booking.expectedEndTime).toLocaleDateString([], { dateStyle: 'medium' })
+        : null;
+
+    return (
+        <Paper sx={{
+            p: 4,
+            borderRadius: 4,
+            borderLeft: isHeavilyOverdue ? '10px solid #dc2626' : '10px solid #f59e0b',
+            mb: 2,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            minHeight: '120px',
+        }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={3}>
+                <Box sx={{ flex: 1 }}>
+                    <Typography variant="h4" fontWeight={900}>
+                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={0.5} mb={1.5}>
+                        <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                        <Typography color="text.secondary" fontWeight={600}>
+                            {address || <Skeleton width={250} />}
+                        </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                            label={booking.bookingStatus || 'EXPIRED'}
+                            size="small"
+                            sx={{
+                                fontWeight: 700,
+                                bgcolor: isHeavilyOverdue ? '#fee2e2' : '#fef3c7',
+                                color: isHeavilyOverdue ? '#dc2626' : '#b45309',
+                                border: `1px solid ${isHeavilyOverdue ? '#fecaca' : '#fde68a'}`,
+                            }}
+                        />
+                        {size
+                            ? <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                            : <Skeleton variant="rounded" width={70} height={24} sx={{ borderRadius: 4 }} />
+                        }
+                        {endDateStr && (
+                            <Typography variant="caption" color="text.secondary">
+                                until {endDateStr}
+                            </Typography>
+                        )}
+                    </Stack>
+                </Box>
+
+                <Stack spacing={1.5} sx={{ minWidth: { md: '280px' } }}>
+                    {isHeavilyOverdue ? (
+                        <Alert severity="error" sx={{ borderRadius: 2 }}>
+                            <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
+                                Items moved to Lost & Found
+                            </Typography>
+                            <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.4 }}>
+                                Your booking is more than 8 hours overdue. Please contact support.
+                            </Typography>
+                        </Alert>
+                    ) : (
+                        <>
+                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a' }}>
+                                <Typography variant="caption" color="#92400e" fontWeight={700}>Overdue</Typography>
+                                <Typography variant="body2" color="#b45309" fontWeight={800}>
+                                    Payment required
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                color="warning"
+                                fullWidth
+                                onClick={() => alert("Redirecting to Pay Overdue Amount")}
+                                sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}
+                            >
+                                Pay Overdue Amount
+                            </Button>
+                        </>
+                    )}
+                </Stack>
+            </Stack>
+        </Paper>
+    );
+}
