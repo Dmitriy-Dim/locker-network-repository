@@ -1,8 +1,9 @@
 # Cities operations
 
-## Public endpoints 
+### Get all cities 
 
 - GET /api/v1/cities/
+- - Roles: Everyone
 
 Query params:
 
@@ -37,18 +38,16 @@ Response example:
 }
 ```
 
-
-## Admin endpoints 
-
 ### Soft-deleted cities
 
 - GET /api/v1/cities/sd
-- Roles: admin
+- Roles: Admin
 - Query params: `code`, `name`, `limit`, `skip`
 
 ### Create city
 
 - POST /api/v1/cities/
+- Roles: Admin
 
 URL example:
 ```
@@ -80,6 +79,7 @@ Response example:
 ### Soft delete city 
 
 - DELETE /api/v1/cities/:id
+- Roles: Admin
 
 URL example: 
 ```
@@ -105,6 +105,7 @@ Response example:
 ### Edit city
 
 - PATCH /api/v1/cities/:id
+- Roles: Admin
 
 URL example: 
 ```
@@ -144,6 +145,7 @@ Response example:
 ### View soft deleted cities
 
 - GET /api/v1/cities/sd
+- Roles: Admin
 
 URL example:
 ```
@@ -180,6 +182,7 @@ Response example:
 ### Restore city from soft deleted list
 
 - PATCH /api/v1/cities/sd/:id
+- Roles: Admin
 
 URL example:
 ```
