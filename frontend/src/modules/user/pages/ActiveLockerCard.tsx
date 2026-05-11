@@ -690,6 +690,7 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
 export function ActionRequiredLockerCard({ booking }: { booking: any }) {
     const stationId = booking.stationId;
     const lockerBoxId = booking.lockerBoxId;
+
     const [now] = useState(() => Date.now());
 
     const { data: stationData, isLoading: isStationLoading } = useQuery({
@@ -728,14 +729,14 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
             borderLeft: isHeavilyOverdue ? '10px solid #dc2626' : '10px solid #f59e0b',
             mb: 2,
             boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-            minHeight: '120px',
         }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={3}>
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="h4" fontWeight={900}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'stretch' }} spacing={3}>
+
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h3" fontWeight={900}>
                         {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
                     </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center" mt={0.5} mb={1.5}>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
                         <Typography color="text.secondary" fontWeight={600}>
                             {address || <Skeleton width={250} />}
@@ -744,7 +745,6 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Chip
                             label={booking.bookingStatus || 'EXPIRED'}
-                            size="small"
                             sx={{
                                 fontWeight: 700,
                                 bgcolor: isHeavilyOverdue ? '#fee2e2' : '#fef3c7',
@@ -753,18 +753,24 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                             }}
                         />
                         {size
-                            ? <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                            : <Skeleton variant="rounded" width={70} height={24} sx={{ borderRadius: 4 }} />
+                            ? <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
+                            : <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
                         }
-                        {endDateStr && (
-                            <Typography variant="caption" color="text.secondary">
-                                until {endDateStr}
-                            </Typography>
-                        )}
                     </Stack>
                 </Box>
 
-                <Stack spacing={1.5} sx={{ minWidth: { md: '280px' } }}>
+                <Stack
+                    alignItems={{ xs: 'stretch', md: 'flex-end' }}
+                    justifyContent="center"
+                    spacing={1.5}
+                    sx={{ minWidth: { md: '300px' } }}
+                >
+                    {endDateStr && (
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} textAlign={{ md: 'right' }}>
+                            Booked until {endDateStr}
+                        </Typography>
+                    )}
+
                     {isHeavilyOverdue ? (
                         <Alert severity="error" sx={{ borderRadius: 2 }}>
                             <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
@@ -776,7 +782,7 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                         </Alert>
                     ) : (
                         <>
-                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a' }}>
+                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a', width: '100%' }}>
                                 <Typography variant="caption" color="#92400e" fontWeight={700}>Overdue</Typography>
                                 <Typography variant="body2" color="#b45309" fontWeight={800}>
                                     Payment required
