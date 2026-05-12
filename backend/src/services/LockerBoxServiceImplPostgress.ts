@@ -2,6 +2,7 @@ import {Request, Response} from "express";
 import {LockerStatus, TechnicalStatus} from "@prisma/client";
 
 import {HttpError} from "../errorHandler/HttpError";
+import {logger} from "../Logger/winston";
 import {
     lockerCatalogProjectionService
 } from "../repositories/prisma/LockerCatalogProjectionService";
@@ -497,6 +498,13 @@ export class LockerBoxServiceImplPostgres {
 
     async hardResyncLockerCache(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
+
+        logger.info("Locker hard refresh requested", {
+            actorId: req.user?.userId,
+            correlationId: req.correlationId,
+            lockerBoxId,
+        });
+
         const [projection, cachedLocker] = await Promise.all([
             lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId),
             loadOneLocker(lockerBoxId),
@@ -513,6 +521,25 @@ export class LockerBoxServiceImplPostgres {
             req.user?.userId,
             forcedVersion,
         );
+
+        if (lockerCacheStatus === "FAILED") {
+            logger.error("Locker hard refresh finished with queue enqueue failure", {
+                actorId: req.user?.userId,
+                correlationId: req.correlationId,
+                lockerBoxId,
+                queuedVersion: forcedVersion,
+            });
+        }
+
+        logger.info("Locker hard refresh executed from RDS source of truth through cache projection queue", {
+            actorId: req.user?.userId,
+            correlationId: req.correlationId,
+            lockerBoxId,
+            sourceVersion: projection.version,
+            cachedVersion: cachedLocker?.version,
+            queuedVersion: forcedVersion,
+            lockerCacheStatus,
+        });
 
         return sendSuccess(res, {
             lockerBoxId,

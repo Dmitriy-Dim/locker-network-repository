@@ -18,7 +18,7 @@ import {
 export type LockerQuery = {
     stationId?: string;
     size?: "S" | "M" | "L";
-    status?: "AVAILABLE" | "RESERVED" | "OCCUPIED" | "EXPIRED";
+    status?: LockerStatus;
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";

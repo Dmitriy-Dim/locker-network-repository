@@ -1,9 +1,17 @@
 import {z} from "zod";
 
+export const PublicLockerStatusEnum = z.enum([
+    "AVAILABLE",
+    "RESERVED",
+    "OCCUPIED",
+    "EXPIRED"
+]);
+
 export const LockerStatusEnum = z.enum([
     "AVAILABLE",
     "RESERVED",
     "OCCUPIED",
+    "FAULTY",
     "EXPIRED"
 ]);
 
@@ -32,7 +40,7 @@ export const getLockersWithParamsSchema = z.object({
     query: z.object({
         stationId: z.string().uuid().optional(),
         size: LockerSizeEnum.optional(),
-        status: LockerStatusEnum.optional(),
+        status: PublicLockerStatusEnum.optional(),
         limit: z.coerce.number().int().positive().max(200).optional(),
         skip: z.coerce.number().int().nonnegative().optional(),
     })
