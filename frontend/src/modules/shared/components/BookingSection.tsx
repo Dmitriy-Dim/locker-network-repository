@@ -14,7 +14,6 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useBooking } from '../../../hooks/useBooking';
 
-
 interface BookingSectionProps {
     stationId: string;
     initialSize?: "S" | "M" | "L";
@@ -32,16 +31,24 @@ export function BookingSection({ stationId, initialSize = "M" }: BookingSectionP
 
     const [selectedDate, setSelectedDate] = useState(() => {
         const d = new Date();
-        return d.toISOString().split('T')[0];
+        d.setMinutes(d.getMinutes() + 6);
+
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     });
 
     const [selectedTime, setSelectedTime] = useState(() => {
         const d = new Date();
-        d.setHours(d.getHours() + 3);
-        return d.toTimeString().slice(0, 5);
-    });
-    const [currentTime, setCurrentTime] = useState(() => Date.now());
+        d.setMinutes(d.getMinutes() + 6);
 
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+    });
+
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -49,7 +56,6 @@ export function BookingSection({ stationId, initialSize = "M" }: BookingSectionP
         }, 10000);
         return () => clearInterval(timer);
     }, []);
-
 
     const expectedEndTime = new Date(`${selectedDate}T${selectedTime}:00`);
     const diffMs = expectedEndTime.getTime() - currentTime;

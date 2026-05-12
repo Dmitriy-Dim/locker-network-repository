@@ -17,8 +17,20 @@ import {
 export class CitiesServiceImplPostgres {
 
     async getAllCities(req: Request, res: Response) {
+        const code = req.query.code as string | undefined;
+        const name = req.query.name as string | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
         const cities = await loadCitiesWithFallback();
-        return sendSuccess(res, cities);
+        const filteredCities = cities
+            .filter((city) => !code || city.code.toLowerCase().includes(code.toLowerCase()))
+            .filter((city) => !name || city.name.toLowerCase().includes(name.toLowerCase()));
+
+        return sendSuccess(res, filteredCities.slice(skip, limit === undefined ? undefined : skip + limit), 200, {
+            limit,
+            skip,
+            total: filteredCities.length,
+        });
     }
 
     async createCities(req: Request, res: Response) {
@@ -331,10 +343,19 @@ export class CitiesServiceImplPostgres {
     }
 
     async getSoftDeletedCities(req: Request, res: Response) {
-        const cities = await prismaService.city.findMany({
-            where: {
-                isActive: false,
-            },
+        const code = req.query.code as string | undefined;
+        const name = req.query.name as string | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const where = {
+            isActive: false,
+            ...(code && { code: { contains: code, mode: "insensitive" as const } }),
+            ...(name && { name: { contains: name, mode: "insensitive" as const } }),
+        };
+
+        const [cities, total] = await prismaService.$transaction([
+            prismaService.city.findMany({
+                where,
             select: {
                 cityId: true,
                 code: true,
@@ -346,9 +367,17 @@ export class CitiesServiceImplPostgres {
             orderBy: {
                 updatedAt: "desc",
             },
-        });
+                skip,
+                ...(limit !== undefined && { take: limit }),
+            }),
+            prismaService.city.count({ where }),
+        ]);
 
-        return sendSuccess(res, cities);
+        return sendSuccess(res, cities, 200, {
+            limit,
+            skip,
+            total,
+        });
     }
 
     async restoreSoftDeletedCities(req: Request, res: Response) {

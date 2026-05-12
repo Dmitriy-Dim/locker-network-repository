@@ -36,7 +36,7 @@ Validation failures are also returned with `error.code = "HTTP_ERROR"` because r
 - Primary source: Redis station cache
 - Redis catalog is reconciled with RDS projections before response is returned
 - Fallback source: RDS projections when Redis is unavailable or access is denied
-- Query params: `city`, `lat`, `lng`, `radius`, `status`
+- Query params: `cityId`, `city`, `lat`, `lng`, `radius`, `status`, `limit`, `skip`
 
 Example `200 OK` body:
 
@@ -143,6 +143,7 @@ Responses:
 
 - Roles: operator, admin
 - Source: RDS
+- Query params: `cityId`, `city`, `status`, `limit`, `skip`
 
 Example `200 OK` body:
 
@@ -294,7 +295,7 @@ Responses:
 - `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
 - `500 Internal Server Error` - projection build failed or unexpected repository/service failure
 
-#### PATCH /api/v1/lockers/admin/stations/:id/status
+#### PATCH /api/v1/lockers/oper/stations/:id/status
 
 - Roles: operator, admin
 - Updates RDS first

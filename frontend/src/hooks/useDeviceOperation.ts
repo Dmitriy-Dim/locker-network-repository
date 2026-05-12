@@ -36,6 +36,11 @@ export function useDeviceOperation(role: Role = 'user') {
         mutationFn: (bookingId: string) => devicesApi.cancelBooking(bookingId),
         onSuccess: (data) => setOperationId(data.operationId),
     });
+    const extendMutation = useMutation({
+        mutationFn: ({ bookingId, endTime }: { bookingId: string, endTime: string }) =>
+            devicesApi.extendBooking(bookingId, endTime),
+        onSuccess: (data) => setOperationId(data.operationId),
+    });
 
 
     const { data: operationData, error: pollError } = useQuery<DeviceOperationData>({
@@ -54,7 +59,10 @@ export function useDeviceOperation(role: Role = 'user') {
     useEffect(() => {
         if (operationData?.status === 'SUCCESS' && !processedOpsRef.current.has(operationData.operationId)) {
             processedOpsRef.current.add(operationData.operationId);
-
+            if (operationData.payment?.paymentUrl) {
+                window.location.href = operationData.payment.paymentUrl;
+                return;
+            }
             if (operationData.type === 'LOCKER_OPEN' || operationData.type === 'LOCKER_OPEN_BATCH') {
                 // eslint-disable-next-line react-hooks/set-state-in-effect
                 setLockerOpenState(true);
@@ -76,6 +84,7 @@ export function useDeviceOperation(role: Role = 'user') {
         openMutation.isPending ||
         closeMutation.isPending ||
         cancelMutation.isPending ||
+        extendMutation.isPending ||
         isQueryStarting ||
         (!!operationData && (operationData.status === 'PENDING' || operationData.status === 'PROCESSING'));
 
@@ -88,6 +97,7 @@ export function useDeviceOperation(role: Role = 'user') {
         openLocker: openMutation.mutateAsync,
         closeLocker: closeMutation.mutateAsync,
         cancelBookingDevice: cancelMutation.mutateAsync,
+        extendBooking: extendMutation.mutateAsync,
         resetOperation,
         isWorking,
         isLockerOpen: lockerOpenState,

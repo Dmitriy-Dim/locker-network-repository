@@ -65,3 +65,11 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
         next(e);
     }
 };
+
+export const endBooking = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.endBooking(req, res);
+    } catch (e) {
+        next(e);
+    }
+};

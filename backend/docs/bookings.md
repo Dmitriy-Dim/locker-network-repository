@@ -2,7 +2,7 @@
 
 This file is kept only as a compatibility pointer.
 
-The canonical booking contracts now live in [booking-flow-contracts.md](./booking-flow-contracts.md).
+The canonical booking contracts now live in [contracts/booking-flow-contracts.md](./contracts/booking-flow-contracts.md).
 
 Why this file was reduced:
 
@@ -12,7 +12,7 @@ Why this file was reduced:
 
 Use these documents instead:
 
-- end-to-end booking API and storage contracts: [booking-flow-contracts.md](./booking-flow-contracts.md)
+- end-to-end booking API and storage contracts: [contracts/booking-flow-contracts.md](./contracts/booking-flow-contracts.md)
 - backend overview and local setup: [README.md](./README.md)
 
 Current API convention reminder:

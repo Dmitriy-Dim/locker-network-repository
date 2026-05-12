@@ -22,3 +22,12 @@ export const changePriceSchema = z.object({
         id: z.string().uuid(),
     })
 });
+
+export const pricingQuerySchema = z.object({
+    query: z.object({
+        cityId: z.string().uuid().optional(),
+        size: LockerSizeEnum.optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
+    }),
+});

@@ -6,6 +6,7 @@ import {env} from "../config/env";
 import {HttpError} from "../errorHandler/HttpError";
 import {logger} from "../Logger/winston";
 import { logSecurityEvent, SecurityEventType } from "../services/securityEventService";
+import {prismaService} from "../services/prismaService";
 import {TokenPayload} from "../utils/jwt";
 
 export const protect: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -20,17 +21,10 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
         });
         return next(new HttpError(401, 'You are not logged in'));
     }
+    let decoded: TokenPayload;
+
     try {
-        const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET!) as TokenPayload;
-
-        const currentUser = {
-            userId: decoded.userId,
-            role: decoded.role,
-            sessionId: decoded.sessionId,
-        }
-
-        req.user = currentUser;
-        next();
+        decoded = jwt.verify(token, env.JWT_ACCESS_SECRET!) as TokenPayload;
     } catch (e) {
         (req.log || logger).warn("Invalid auth token");
         void logSecurityEvent({
@@ -38,7 +32,42 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
             eventType: SecurityEventType.AUTH_INVALID_TOKEN,
             reason: e instanceof Error ? e.message : "Invalid access token",
         });
-        next(new HttpError(401, 'Invalid token'));
+        return next(new HttpError(401, 'Invalid token'));
+    }
+
+    try {
+        const registeredUser = await prismaService.user.findUnique({
+            where: { userId: decoded.userId },
+            select: {
+                userId: true,
+                role: true,
+            },
+        });
+
+        if (!registeredUser) {
+            void logSecurityEvent({
+                req,
+                actorId: decoded.userId,
+                eventType: SecurityEventType.AUTH_USER_NOT_REGISTERED,
+                reason: "Access token subject does not match a registered user",
+                details: {
+                    sessionId: decoded.sessionId,
+                    tokenRole: decoded.role,
+                },
+            });
+            return next(new HttpError(401, "Invalid token"));
+        }
+
+        const currentUser = {
+            userId: registeredUser.userId,
+            role: registeredUser.role,
+            sessionId: decoded.sessionId,
+        }
+
+        req.user = currentUser;
+        next();
+    } catch (e) {
+        next(e);
     }
 };
 

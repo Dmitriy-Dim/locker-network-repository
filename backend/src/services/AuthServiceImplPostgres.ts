@@ -152,7 +152,7 @@ export class AuthServiceImplPostgres {
         if (!user) {
             void logSecurityEvent({
                 req,
-                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                eventType: SecurityEventType.AUTH_USER_NOT_REGISTERED,
                 reason: "Login failed: user not found",
                 details: { email },
             });

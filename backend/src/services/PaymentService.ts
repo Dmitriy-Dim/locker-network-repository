@@ -7,6 +7,12 @@ import { BookingRecordDto } from "../contracts/booking.dto";
 import { HttpError } from "../errorHandler/HttpError";
 import { sendSuccess } from "../utils/response";
 import { env } from "../config/env";
+import {
+    buildRequestAlertContext,
+    emitSecurityAlert,
+    SecurityAlertEventType,
+    SecurityAlertSeverity,
+} from "../utils/securityAlert";
 
 import { getBooking } from "./dynamoService";
 import { OperationType } from "./dto/operationDto";
@@ -35,12 +41,32 @@ type StripeWebhookEvent = {
 
 type PaymentWebhookPayload = {
     bookingId: string;
+    operationId?: string;
     paymentSessionId: string;
     providerPaymentId: string;
     amount: number;
     currency: string;
     paymentFlow: "BOOKING_INIT" | "BOOKING_EXTEND";
 };
+
+function emitPaymentAlert(
+    req: Request,
+    eventType: SecurityAlertEventType,
+    severity: SecurityAlertSeverity,
+    reason: string,
+    details?: Record<string, unknown>
+) {
+    emitSecurityAlert({
+        ...buildRequestAlertContext(req),
+        eventType,
+        severity,
+        reason,
+        details: {
+            provider: "stripe",
+            ...details,
+        },
+    });
+}
 
 function toDecimal(value: number) {
     return new Prisma.Decimal(value);
@@ -118,6 +144,7 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
     }
 
     const bookingId = object.metadata?.bookingId ?? object.client_reference_id ?? undefined;
+    const operationId = object.metadata?.operationId ?? undefined;
     const paymentSessionId = object.id ?? object.metadata?.paymentSessionId ?? undefined;
     const providerPaymentId = object.payment_intent ?? object.metadata?.providerPaymentId ?? undefined;
     const amountMinor = object.amount_total ?? object.amount_received ?? object.amount ?? undefined;
@@ -131,6 +158,7 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
 
     return {
         bookingId,
+        ...(operationId ? { operationId } : {}),
         paymentSessionId,
         providerPaymentId,
         amount: toAmountMajorUnits(amountMinor),
@@ -212,7 +240,7 @@ export class PaymentService {
 
     private async finalizeExtendPaymentInRds(stagedBooking: BookingRecordDto, paymentPayload: PaymentWebhookPayload, paidAtIso: string) {
         const paidAt = new Date(paidAtIso);
-        const nextExpectedEndTime = stagedBooking.pendingExtendExpectedEndTime;
+        const nextExpectedEndTime = stagedBooking.pendingExtendEndTime;
 
         if (!nextExpectedEndTime) {
             throw new HttpError(409, "Pending booking extension not found");
@@ -280,7 +308,7 @@ export class PaymentService {
                         amount: paymentPayload.amount,
                         currency: paymentPayload.currency,
                         paymentFlow: paymentPayload.paymentFlow,
-                        pendingExtendExpectedEndTime: nextExpectedEndTime,
+                        pendingExtendEndTime: nextExpectedEndTime,
                     },
                 },
             });
@@ -295,19 +323,68 @@ export class PaymentService {
 
     async handleStripeWebhook(req: Request, res: Response) {
         if (!Buffer.isBuffer(req.body)) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_WEBHOOK_INVALID_PAYLOAD",
+                "MEDIUM",
+                "Stripe webhook did not use raw request body"
+            );
             throw new HttpError(400, "Stripe webhook requires raw request body");
         }
 
         const signatureHeader = req.headers["stripe-signature"];
 
         if (typeof signatureHeader !== "string") {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_WEBHOOK_SIGNATURE_INVALID",
+                "CRITICAL",
+                "Missing Stripe signature header"
+            );
             throw new HttpError(400, "Missing Stripe signature header");
         }
 
-        verifyStripeSignature(req.body, signatureHeader);
+        try {
+            verifyStripeSignature(req.body, signatureHeader);
+        } catch (error) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_WEBHOOK_SIGNATURE_INVALID",
+                "CRITICAL",
+                error instanceof Error ? error.message : "Stripe signature verification failed"
+            );
+            throw error;
+        }
 
-        const event = JSON.parse(req.body.toString("utf8")) as StripeWebhookEvent;
-        const paymentPayload = extractPaymentPayload(event);
+        let event: StripeWebhookEvent;
+
+        try {
+            event = JSON.parse(req.body.toString("utf8")) as StripeWebhookEvent;
+        } catch (error) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_WEBHOOK_INVALID_PAYLOAD",
+                "MEDIUM",
+                "Stripe webhook body is not valid JSON",
+                { error: error instanceof Error ? error.message : "Unknown error" }
+            );
+            throw new HttpError(400, "Invalid Stripe event payload");
+        }
+
+        let paymentPayload: PaymentWebhookPayload | null;
+
+        try {
+            paymentPayload = extractPaymentPayload(event);
+        } catch (error) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_WEBHOOK_INVALID_PAYLOAD",
+                "MEDIUM",
+                error instanceof Error ? error.message : "Stripe event does not contain required payment fields",
+                { eventId: event.id, eventType: event.type }
+            );
+            throw error;
+        }
 
         if (!paymentPayload) {
             return sendSuccess(res, {
@@ -324,6 +401,18 @@ export class PaymentService {
         const stagedBooking = await getBooking(paymentPayload.bookingId) as BookingRecordDto | undefined;
 
         if (!stagedBooking) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_BOOKING_NOT_FOUND",
+                "MEDIUM",
+                "Paid Stripe booking was not found in staged booking storage",
+                {
+                    eventId: event.id,
+                    bookingId: paymentPayload.bookingId,
+                    paymentSessionId: paymentPayload.paymentSessionId,
+                    paymentFlow: paymentPayload.paymentFlow,
+                }
+            );
             throw new HttpError(404, "Booking not found");
         }
 
@@ -331,6 +420,19 @@ export class PaymentService {
         const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
         if (ttl !== undefined && ttl < nowEpochSeconds) {
+            emitPaymentAlert(
+                req,
+                "PAYMENT_BOOKING_EXPIRED",
+                "MEDIUM",
+                "Stripe payment arrived for expired staged booking",
+                {
+                    eventId: event.id,
+                    bookingId: paymentPayload.bookingId,
+                    paymentSessionId: paymentPayload.paymentSessionId,
+                    ttl,
+                    nowEpochSeconds,
+                }
+            );
             throw new HttpError(409, "Booking TTL expired");
         }
 
@@ -338,16 +440,56 @@ export class PaymentService {
         let operationId = stagedBooking?.operationId ?? randomUUID();
 
         if (paymentPayload.paymentFlow === "BOOKING_EXTEND") {
+            if (!paymentPayload.operationId) {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_WEBHOOK_INVALID_PAYLOAD",
+                    "MEDIUM",
+                    "Stripe booking extension event does not contain operationId",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        paymentSessionId: paymentPayload.paymentSessionId,
+                    }
+                );
+                throw new HttpError(400, "Stripe event does not contain required booking extension operationId");
+            }
+
             if (stagedBooking.extendPaymentSessionId !== paymentPayload.paymentSessionId) {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_SESSION_MISMATCH",
+                    "CRITICAL",
+                    "extend paymentSessionId does not match staged booking",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        expectedPaymentSessionId: stagedBooking.extendPaymentSessionId,
+                        receivedPaymentSessionId: paymentPayload.paymentSessionId,
+                        paymentFlow: paymentPayload.paymentFlow,
+                    }
+                );
                 throw new HttpError(409, "extend paymentSessionId does not match staged booking");
             }
 
             if (stagedBooking.extendPaymentStatus === "PAID") {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_ALREADY_PROCESSED",
+                    "LOW",
+                    "Stripe booking extension event was already paid",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        paymentSessionId: paymentPayload.paymentSessionId,
+                        paymentFlow: paymentPayload.paymentFlow,
+                    }
+                );
                 throw new HttpError(409, "Booking extension already paid");
             }
 
             await this.finalizeExtendPaymentInRds(stagedBooking, paymentPayload, paymentConfirmedAt);
-            operationId = stagedBooking.extendOperationId ?? operationId;
+            operationId = paymentPayload.operationId;
 
             await sendBookingExtendConfirmToQueue({
                 operationId,
@@ -355,7 +497,7 @@ export class PaymentService {
                 payload: {
                     bookingId: paymentPayload.bookingId,
                     userId: stagedBooking.userId,
-                    expectedEndTime: stagedBooking.pendingExtendExpectedEndTime ?? stagedBooking.expectedEndTime,
+                    expectedEndTime: stagedBooking.pendingExtendEndTime ?? stagedBooking.expectedEndTime,
                     paymentSessionId: paymentPayload.paymentSessionId,
                     providerPaymentId: paymentPayload.providerPaymentId,
                     amount: paymentPayload.amount,
@@ -364,14 +506,52 @@ export class PaymentService {
             });
         } else {
             if (stagedBooking.paymentSessionId !== paymentPayload.paymentSessionId) {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_SESSION_MISMATCH",
+                    "CRITICAL",
+                    "paymentSessionId does not match staged booking",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        expectedPaymentSessionId: stagedBooking.paymentSessionId,
+                        receivedPaymentSessionId: paymentPayload.paymentSessionId,
+                        paymentFlow: paymentPayload.paymentFlow,
+                    }
+                );
                 throw new HttpError(409, "paymentSessionId does not match staged booking");
             }
 
             if (stagedBooking.status === "ACTIVE") {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_ALREADY_PROCESSED",
+                    "LOW",
+                    "Stripe booking event was already active",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        paymentSessionId: paymentPayload.paymentSessionId,
+                        bookingStatus: stagedBooking.status,
+                    }
+                );
                 throw new HttpError(409, "Booking already active");
             }
 
             if (stagedBooking.paymentStatus === "PAID" && stagedBooking.status !== "PAYMENT_CONFIRMED") {
+                emitPaymentAlert(
+                    req,
+                    "PAYMENT_ALREADY_PROCESSED",
+                    "LOW",
+                    "Stripe booking event was already paid",
+                    {
+                        eventId: event.id,
+                        bookingId: paymentPayload.bookingId,
+                        paymentSessionId: paymentPayload.paymentSessionId,
+                        bookingStatus: stagedBooking.status,
+                        paymentStatus: stagedBooking.paymentStatus,
+                    }
+                );
                 throw new HttpError(409, "Booking already paid");
             }
 

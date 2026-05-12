@@ -17,3 +17,27 @@ export const getAllUsers = async (req: Request, res: Response, next: NextFunctio
         next(e);
     }
 };
+
+export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await AdminActions.getUserById(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await AdminActions.deleteUser(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const restoreUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await AdminActions.restoreUser(req, res);
+    } catch (e) {
+        next(e);
+    }
+};

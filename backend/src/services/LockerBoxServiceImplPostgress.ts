@@ -27,9 +27,29 @@ import {
 import {prismaService} from "./prismaService";
 
 export class LockerBoxServiceImplPostgres {
-    async getAllBoxes(_req: Request, res: Response) {
+    async getAllBoxes(req: Request, res: Response) {
         const lockers = await lockerCatalogProjectionService.getAllLockersAdminView();
-        return sendSuccess(res, lockers);
+        const stationId = req.query.stationId as string | undefined;
+        const city = req.query.city as string | undefined;
+        const code = req.query.code as string | undefined;
+        const size = req.query.size as LockerQuery["size"] | undefined;
+        const status = req.query.status as LockerQuery["status"] | undefined;
+        const techStatus = req.query.techStatus as TechnicalStatus | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const filteredLockers = lockers
+            .filter((locker) => !stationId || locker.stationId === stationId)
+            .filter((locker) => !city || locker.station.city.toLowerCase().includes(city.toLowerCase()))
+            .filter((locker) => !code || locker.code.toLowerCase().includes(code.toLowerCase()))
+            .filter((locker) => !size || locker.size === size)
+            .filter((locker) => !status || locker.status === status)
+            .filter((locker) => !techStatus || locker.techStatus === techStatus);
+
+        return sendSuccess(res, filteredLockers.slice(skip, limit === undefined ? undefined : skip + limit), 200, {
+            limit,
+            skip,
+            total: filteredLockers.length,
+        });
     }
 
     async createBox(req: Request, res: Response) {
@@ -117,6 +137,8 @@ export class LockerBoxServiceImplPostgres {
         const stationId = req.query.stationId as string | undefined;
         const size = req.query.size as LockerQuery["size"] | undefined;
         const status = req.query.status as LockerQuery["status"] | undefined;
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
 
         const lockers = await loadLockers();
 
@@ -128,7 +150,11 @@ export class LockerBoxServiceImplPostgres {
             .filter((locker) => locker.techStatus === "ACTIVE")
             .map(toLockerResponse);
 
-        return sendSuccess(res, result);
+        return sendSuccess(res, result.slice(skip, limit === undefined ? undefined : skip + limit), 200, {
+            limit,
+            skip,
+            total: result.length,
+        });
     }
 
     async getOneBox(req: Request, res: Response) {

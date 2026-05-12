@@ -2,11 +2,21 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Box, Typography, Button, Paper, Stack } from "@mui/material";
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { Paths } from "../../../config/paths/paths.ts";
+import { getPaymentUrl } from "../../../hooks/useBooking.ts";
 
 export function PaymentCancel() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const bookingId = searchParams.get('bookingId');
+
+    const handleTryAgain = () => {
+        if (bookingId) {
+            const paymentUrl = getPaymentUrl(bookingId);
+            if (paymentUrl) {
+                window.location.href = paymentUrl;
+            }
+        }
+    };
 
     return (
         <Box sx={{ pt: '100px', display: 'flex', justifyContent: 'center', px: 2 }}>
@@ -45,7 +55,7 @@ export function PaymentCancel() {
                         <Button
                             variant="contained"
                             fullWidth
-                            onClick={() => navigate(Paths.USER)} // Можно поменять на роут выбора станций, если он отличается
+                            onClick={handleTryAgain}
                             sx={{ bgcolor: '#f97316', fontWeight: 700, py: 1.5, borderRadius: 2, '&:hover': { bgcolor: '#ea580c' } }}
                         >
                             Try Again

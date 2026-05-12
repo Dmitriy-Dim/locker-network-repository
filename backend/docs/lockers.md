@@ -35,7 +35,7 @@ Validation failures are also returned with `error.code = "HTTP_ERROR"` because r
 - Roles: all
 - Primary source: DynamoDB cache
 - Fallback source: RDS projections when DynamoDB is unavailable or access is denied
-- Query params: `stationId`, `size`, `status`
+- Query params: `stationId`, `size`, `status`, `limit`, `skip`
 
 Example `200 OK` body:
 
@@ -130,6 +130,7 @@ Responses:
 
 - Roles: operator, admin
 - Source: RDS
+- Query params: `stationId`, `city`, `code`, `size`, `status`, `techStatus`, `limit`, `skip`
 
 Example `200 OK` body:
 

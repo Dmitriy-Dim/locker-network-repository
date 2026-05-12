@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { devicesApi, type UserDevicePayload } from '../api/devicesApi';
 
@@ -31,20 +31,37 @@ export function useLockerOperation() {
         onError: (error) => console.error("Error starting close operation:", error)
     });
 
+    const extendMutation = useMutation({
+        mutationFn: ({ bookingId, endTime }: { bookingId: string, endTime: string }) =>
+            devicesApi.extendBooking(bookingId, endTime),
+        onSuccess: (data) => {
+            setOperationId(data.operationId);
+        },
+    });
+
     const resetOperation = () => {
         setOperationId(null);
         qc.removeQueries({ queryKey: ['device-operation'] });
     };
 
     const operation = operationQuery.data;
+
+    useEffect(() => {
+        if (operation?.payment?.paymentUrl) {
+            window.location.href = operation.payment.paymentUrl;
+        }
+    }, [operation]);
+
     const isWorking =
         openLocker.isPending ||
         closeLocker.isPending ||
+        extendMutation.isPending ||
         (operationQuery.isFetching && (operation?.status === 'PENDING' || operation?.status === 'PROCESSING'));
 
     return {
         openLocker: openLocker.mutateAsync,
         closeLocker: closeLocker.mutateAsync,
+        extendBooking: extendMutation.mutateAsync,
         operation,
         isWorking,
         resetOperation

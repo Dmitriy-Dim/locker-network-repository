@@ -38,3 +38,26 @@ export const bookingStatusChangeSchema = z.object({
         status: BookingStatusEnum,
     }),
 });
+
+export const adminBookingsQuerySchema = z.object({
+    query: z.object({
+        status: BookingStatusEnum.optional(),
+        userId: z.string().uuid().optional(),
+        lockerBoxId: z.string().uuid().optional(),
+        stationId: z.string().uuid().optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
+    }),
+});
+
+export const myBookingsQuerySchema = z.object({
+    query: z.object({
+        status: BookingStatusEnum.optional(),
+        lockerBoxId: z.string().uuid().optional(),
+        stationId: z.string().uuid().optional(),
+        limit: z.coerce.number().int().positive().max(100).optional(),
+        skip: z.coerce.number().int().nonnegative().optional(),
+    }),
+});
