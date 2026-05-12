@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { BookingInitRequestDto, BookingRecordDto } from "../contracts/booking.dto";
 import { HttpError } from "../errorHandler/HttpError";
+import { logger } from "../Logger/winston";
 import { operationRepository } from "../repositories/operation/OperationRepository";
 import { logAudit } from "../utils/audit";
 import { sendSuccess } from "../utils/response";
@@ -122,6 +123,21 @@ function isCancellableBookingStatus(status: string) {
     return CANCELLABLE_BOOKING_STATUSES.has(status);
 }
 
+function parseOptionalDate(value: unknown) {
+    if (typeof value !== "string" || value.length === 0) {
+        return undefined;
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function resolveDynamoBookingStatus(status: string) {
+    return Object.values(BookingStatus).includes(status as BookingStatus)
+        ? status as BookingStatus
+        : undefined;
+}
+
 export class BookingService {
     async initBooking(req: Request, res: Response) {
         return idempotencyService.execute(
@@ -159,6 +175,15 @@ export class BookingService {
                         },
                     });
 
+                    logger.info("Booking initialization queued", {
+                        operationId,
+                        actorId: userId,
+                        stationId: body.stationId,
+                        size: body.size,
+                        expectedEndTime: body.expectedEndTime,
+                        sourceOfTruth: "lambda-dynamodb",
+                    });
+
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_INIT,
@@ -186,6 +211,13 @@ export class BookingService {
                     const errorMessage = error instanceof Error ? error.message : "Failed to create booking operation";
 
                     await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    logger.error("Booking initialization queueing failed", {
+                        operationId,
+                        actorId: userId,
+                        stationId: body.stationId,
+                        size: body.size,
+                        reason: errorMessage,
+                    });
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_INIT_FAILED,
@@ -341,6 +373,124 @@ export class BookingService {
         return sendSuccess(res, result);
     }
 
+    async reconcileDynamoBookingsToRds(req: Request, res: Response) {
+        const dynamoBookings = await getAllBookings() as BookingRecordDto[];
+        const failures: Array<{ bookingId?: string; reason: string }> = [];
+        let created = 0;
+        let updated = 0;
+        let skipped = 0;
+
+        logger.info("Dynamo bookings to RDS reconcile started", {
+            actorId: req.user?.userId,
+            total: dynamoBookings.length,
+            sourceOfTruth: "dynamodb",
+            target: "postgres",
+        });
+
+        for (const booking of dynamoBookings) {
+            const status = resolveDynamoBookingStatus(booking.status);
+
+            if (!booking.bookingId || !booking.userId || !booking.lockerBoxId || !booking.stationId || !status) {
+                skipped += 1;
+                failures.push({
+                    bookingId: booking.bookingId,
+                    reason: "Missing required booking fields or unsupported status",
+                });
+                continue;
+            }
+
+            try {
+                const existing = await prismaService.booking.findUnique({
+                    where: { bookingId: booking.bookingId },
+                    select: { bookingId: true },
+                });
+
+                const data = {
+                    userId: booking.userId,
+                    lockerBoxId: booking.lockerBoxId,
+                    stationId: booking.stationId,
+                    status,
+                    startTime: parseOptionalDate(booking.startTime) ?? null,
+                    expectedEndTime: parseOptionalDate(booking.expectedEndTime) ?? null,
+                    totalPrice: typeof booking.price === "number"
+                        ? new Prisma.Decimal(booking.price)
+                        : null,
+                };
+
+                await prismaService.booking.upsert({
+                    where: { bookingId: booking.bookingId },
+                    create: {
+                        bookingId: booking.bookingId,
+                        ...data,
+                        ...(parseOptionalDate(booking.createdAt)
+                            ? { createdAt: parseOptionalDate(booking.createdAt) }
+                            : {}),
+                    },
+                    update: data,
+                });
+
+                if (existing) {
+                    updated += 1;
+                } else {
+                    created += 1;
+                }
+            } catch (error) {
+                skipped += 1;
+                failures.push({
+                    bookingId: booking.bookingId,
+                    reason: error instanceof Error ? error.message : "Unknown reconcile error",
+                });
+            }
+        }
+
+        const logPayload = {
+            actorId: req.user?.userId,
+            total: dynamoBookings.length,
+            created,
+            updated,
+            skipped,
+            failedCount: failures.length,
+            failureSample: failures.slice(0, 10),
+            sourceOfTruth: "dynamodb",
+            target: "postgres",
+        };
+
+        if (failures.length > 0) {
+            logger.warn("Dynamo bookings to RDS reconcile completed with skipped records", logPayload);
+        } else {
+            logger.info("Dynamo bookings to RDS reconcile completed", logPayload);
+        }
+
+        await logAudit({
+            req,
+            action: ActionType.BOOKING_INFO,
+            actorId: req.user?.userId,
+            entityId: "dynamo-bookings-rds-reconcile",
+            entityType: "Booking",
+            details: {
+                sourceOfTruth: "dynamodb",
+                target: "postgres",
+                total: dynamoBookings.length,
+                created,
+                updated,
+                skipped,
+                failedCount: failures.length,
+            },
+        });
+
+        return sendSuccess(res, {
+            total: dynamoBookings.length,
+            created,
+            updated,
+            skipped,
+            failures: failures.slice(0, 50),
+        }, 200, {
+            sourceOfTruth: "dynamodb",
+            target: "postgres",
+            failureCount: failures.length,
+        });
+    }
+
     async updateBookingStatusAdmin(req: Request, res: Response) {
         const bookingId = req.params.id as string;
         const nextStatus = req.body.status as BookingStatus;
@@ -370,6 +520,15 @@ export class BookingService {
                 const operationId = uuidv4();
 
                 try {
+                    logger.info("Admin booking status update requested", {
+                        operationId,
+                        actorId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        nextStatus,
+                        sourceOfTruth: "postgres-localstack-sync",
+                    });
+
                     const updated = await prismaService.booking.update({
                         where: { bookingId },
                         data: {
@@ -396,6 +555,16 @@ export class BookingService {
                             actorId,
                             status: nextStatus,
                         },
+                    });
+
+                    logger.info("Admin booking status update queued", {
+                        operationId,
+                        actorId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        persistedStatus: updated.status,
+                        nextStatus,
+                        sourceOfTruth: "postgres-localstack-sync",
                     });
 
                     await logAudit({
@@ -432,6 +601,14 @@ export class BookingService {
                     const errorMessage = error instanceof Error ? error.message : "Failed to queue booking status update";
 
                     await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    logger.error("Admin booking status update queueing failed", {
+                        operationId,
+                        actorId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        nextStatus,
+                        reason: errorMessage,
+                    });
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
@@ -501,6 +678,13 @@ export class BookingService {
                     });
 
                     if (existingRdsBooking?.status === BookingStatus.CANCELLED) {
+                        logger.info("Booking cancellation skipped because booking is already cancelled", {
+                            actorId: userId,
+                            bookingId,
+                            bookingStatus: existingRdsBooking.status,
+                            sourceOfTruth: "postgres",
+                        });
+
                         return {
                             statusCode: 200,
                             body: {
@@ -539,6 +723,16 @@ export class BookingService {
                         })
                         : undefined;
 
+                    logger.info("Booking cancellation RDS state prepared", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousDynamoStatus: booking.status,
+                        previousRdsStatus: existingRdsBooking?.status,
+                        persistedStatus: updated?.status,
+                        sourceOfTruth: existingRdsBooking ? "postgres-localstack-sync" : "lambda-dynamodb",
+                    });
+
                     await sendBookingCancelToQueue({
                         operationId,
                         type: OperationType.BOOKING_CANCEL,
@@ -546,6 +740,15 @@ export class BookingService {
                             bookingId,
                             actorId: userId,
                         },
+                    });
+
+                    logger.info("Booking cancellation queued", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousStatus: booking.status,
+                        previousLockerStatus: lockerStatus,
+                        sourceOfTruth: "lambda-dynamodb",
                     });
 
                     await logAudit({
@@ -587,6 +790,14 @@ export class BookingService {
                     if (operationCreated) {
                         await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
                     }
+                    logger.error("Booking cancellation queueing failed", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousStatus: booking.status,
+                        previousLockerStatus: lockerStatus,
+                        reason: errorMessage,
+                    });
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_CANCEL_FAILED,
@@ -678,6 +889,16 @@ export class BookingService {
                         },
                     });
 
+                    logger.info("Booking end RDS state updated", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        persistedStatus: updated.status,
+                        previousLockerStatus: lockerStatus,
+                        sourceOfTruth: "postgres-localstack-sync",
+                    });
+
                     await operationRepository.create({
                         operationId,
                         userId,
@@ -700,6 +921,16 @@ export class BookingService {
                             requestedAt,
                             finalizeBooking: true,
                         },
+                    });
+
+                    logger.info("Booking end locker close queued", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        lockerBoxId: booking.lockerBoxId,
+                        stationId: booking.stationId,
+                        previousStatus: existing.status,
+                        persistedStatus: updated.status,
                     });
 
                     await logAudit({
@@ -738,6 +969,14 @@ export class BookingService {
                     const errorMessage = error instanceof Error ? error.message : "Failed to queue booking end";
 
                     await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    logger.error("Booking end queueing failed", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        previousLockerStatus: lockerStatus,
+                        reason: errorMessage,
+                    });
                     await logAudit({
                         req,
                         action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
@@ -896,6 +1135,18 @@ export class BookingService {
                 },
             });
 
+            logger.info("Booking extension queued", {
+                operationId,
+                actorId: userId,
+                bookingId,
+                currentBookingStatus: booking.status,
+                currentLockerStatus: lockerStatus,
+                nextExpectedEndTime: nextExpectedEndTime.toISOString(),
+                expectedBookingStatus: nextBookingStatus,
+                expectedLockerStatus: nextLockerStatus,
+                sourceOfTruth: "lambda-dynamodb",
+            });
+
             await logAudit({
                 req,
                 action: ActionType.BOOKING_UPDATE_STATUS,
@@ -937,6 +1188,13 @@ export class BookingService {
                     error instanceof Error ? error.message : "Failed to queue booking extend"
                 );
             }
+
+            logger.error("Booking extension queueing failed", {
+                operationId,
+                actorId: userId,
+                bookingId,
+                reason: error instanceof Error ? error.message : "Unknown error",
+            });
 
             await logAudit({
                 req,

@@ -18,6 +18,7 @@ export const bookingsRoutes = express.Router();
 bookingsRoutes.use(protect);
 bookingsRoutes.post("/init", authorize(Role.USER), validateRequest(bookingInitSchema), bookingController.initBooking);
 bookingsRoutes.get("/admin", authorize(Role.ADMIN), validateRequest(adminBookingsQuerySchema), bookingController.getAllBookingsAdmin);
+bookingsRoutes.post("/admin/reconcile-dynamo-rds", authorize(Role.ADMIN), bookingController.reconcileDynamoBookingsToRds);
 bookingsRoutes.get("/admin/:id", authorize(Role.ADMIN), validateRequest(oneBookingSchema), bookingController.getBookingAdmin);
 bookingsRoutes.patch("/admin/:id/status", authorize(Role.ADMIN), validateRequest(bookingStatusChangeSchema), bookingController.updateBookingStatusAdmin);
 bookingsRoutes.get("/my", authorize(Role.USER), validateRequest(myBookingsQuerySchema), bookingController.getAllBookings);

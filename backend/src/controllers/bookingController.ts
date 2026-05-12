@@ -50,6 +50,14 @@ export const getBookingAdmin = async (req: Request, res: Response, next: NextFun
     }
 };
 
+export const reconcileDynamoBookingsToRds = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.reconcileDynamoBookingsToRds(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
 export const updateBookingStatusAdmin = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await bookingService.updateBookingStatusAdmin(req, res);
