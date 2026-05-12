@@ -13,7 +13,7 @@ import { BookingCancelCommand } from '../../types/contracts/BookingContracts';
 import { handleBookingExtendConfirm } from '../booking/bookingExtendConfirmService';
 import { BookingExtendConfirmCommand } from '../../types/contracts/BookingContracts';
 import { handleBookingInit } from '../booking/bookingInitService';
-import { handleLockerOpen, handleLockerClose, handleLockerOpenBatch } from './lockerCommandService';
+import { handleLockerOpen, handleLockerClose, handleLockerOpenBatch, handleLockerCloseBatch } from './lockerCommandService';
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -71,6 +71,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         case OperationType.LOCKER_OPEN_BATCH:
           await handleLockerOpenBatch(command as unknown as LockerBatchCommand);
+          break;
+
+        case OperationType.LOCKER_CLOSE_BATCH:
+          await handleLockerCloseBatch(command as unknown as LockerBatchCommand);
           break;
 
         default:
