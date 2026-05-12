@@ -1,5 +1,5 @@
 import { SQSEvent } from 'aws-lambda';
-import { upsertLockerCache, deleteLockerCache } from '../../db/dynamodb';
+import { upsertLockerCache, deleteLockerCache, initLockerDeviceState, deleteLockerDeviceState } from '../../db/dynamodb';
 import { CacheProjectionEvent } from '../../types/contracts/CacheProjectionContracts';
  
 export const handler = async (event: SQSEvent): Promise<void> => {
@@ -23,8 +23,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
           cacheEvent.payload as unknown as Record<string, unknown>,
           cacheEvent.projectionVersion,
         );
+        await initLockerDeviceState(cacheEvent.payload.lockerBoxId, cacheEvent.payload.stationId);
       } else if (cacheEvent.eventType === 'DELETE') {
         await deleteLockerCache(cacheEvent.entityId);
+        await deleteLockerDeviceState(cacheEvent.entityId);
       }
  
       console.log(JSON.stringify({
