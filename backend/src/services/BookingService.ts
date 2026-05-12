@@ -25,6 +25,8 @@ function toPublicBookingResponse(input: {
     paymentStatus: string;
     bookingStatus: string;
     lockerStatus?: string | null;
+    lockerCode?: string | null;
+    stationAddress?: string | null;
     lockerBoxId: string;
     stationId: string;
     startTime: Date | string | null;
@@ -38,6 +40,10 @@ function toPublicBookingResponse(input: {
         paymentStatus: input.paymentStatus,
         bookingStatus: input.bookingStatus,
         ...(input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
+        ...(input.lockerCode ? { code: input.lockerCode} : {}),
+        ...(input.stationAddress !== undefined
+            ? {stationAddress: input.stationAddress}
+            : {}),
         ...(isReservedBooking && input.expiresAt
             ? {
                 expiresAt: input.expiresAt instanceof Date
@@ -101,6 +107,7 @@ async function loadBookingWithLockerStatus(bookingId: string) {
 
     return {
         booking,
+        locker,
         lockerStatus,
     };
 }
@@ -203,7 +210,7 @@ export class BookingService {
             throw new HttpError(404, "Booking not found");
         }
 
-        const { booking, lockerStatus } = bookingWithLocker;
+        const { booking, locker, lockerStatus } = bookingWithLocker;
         const role = req.user?.role;
         const userId = req.user?.userId;
 
@@ -228,6 +235,8 @@ export class BookingService {
             paymentStatus: booking.paymentStatus ?? "PENDING",
             bookingStatus: booking.status,
             lockerStatus,
+            lockerCode: locker?.code ?? null,
+            stationAddress: locker?.station?.address ?? null,
             lockerBoxId: booking.lockerBoxId,
             stationId: booking.stationId,
             startTime: booking.startTime ?? null,
@@ -777,6 +786,8 @@ export class BookingService {
                     paymentStatus: booking.paymentStatus ?? "PENDING",
                     bookingStatus: booking.status,
                     lockerStatus: booking.lockerStatus ?? locker?.status ?? null,
+                    lockerCode: locker?.code ?? null,
+                    stationAddress: locker?.station?.address ?? null,
                     lockerBoxId: booking.lockerBoxId,
                     stationId: booking.stationId,
                     startTime: booking.startTime ?? null,
