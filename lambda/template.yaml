@@ -79,6 +79,7 @@ Resources:
           OPERATIONS_TABLE: !Ref OperationsTable
           BOOKING_TABLE: !Ref BookingTable
           LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+          LOCKER_DEVICE_STATE_TABLE: !Ref LockerDeviceStateTable
           STRIPE_SECRET_KEY: !Ref StripeSecretKey
           FRONTEND_BASE_URL: "https://main.d3vb1066jloxjy.amplifyapp.com"
       Policies:
@@ -88,6 +89,8 @@ Resources:
             TableName: !Ref BookingTable
         - DynamoDBCrudPolicy:
             TableName: !Ref LockerCacheTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LockerDeviceStateTable
       Events:
         SQSEvent:
           Type: SQS
@@ -107,6 +110,28 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub locker-${Environment}-locker-cache
+      AttributeDefinitions:
+        - AttributeName: lockerBoxId
+          AttributeType: S
+        - AttributeName: stationId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lockerBoxId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: stationId-index
+          KeySchema:
+            - AttributeName: stationId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  # ── Locker Device State DynamoDB Table (sensor source of truth) ──
+  LockerDeviceStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub locker-${Environment}-device-state
       AttributeDefinitions:
         - AttributeName: lockerBoxId
           AttributeType: S
@@ -153,9 +178,12 @@ Resources:
       Environment:
         Variables:
           LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+          LOCKER_DEVICE_STATE_TABLE: !Ref LockerDeviceStateTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LockerCacheTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LockerDeviceStateTable
       Events:
         SQSEvent:
           Type: SQS
@@ -216,3 +244,6 @@ Outputs:
   BookingTableName:
     Description: DynamoDB table for bookings
     Value: !Ref BookingTable
+  LockerDeviceStateTableName:
+    Description: DynamoDB table for locker sensor state
+    Value: !Ref LockerDeviceStateTable
