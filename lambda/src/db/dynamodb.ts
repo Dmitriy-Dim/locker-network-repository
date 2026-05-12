@@ -8,7 +8,7 @@ import {
   QueryCommand,
   TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { LockStatus, DoorStatus } from '../types/contracts/LockerContracts';
+import { LockerDeviceState, LockStatus, DoorStatus } from '../types/contracts/LockerContracts';
  
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -16,6 +16,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 const LOCKER_CACHE_TABLE = process.env.LOCKER_CACHE_TABLE || 'locker-dev-locker-cache';
 const OPERATIONS_TABLE = process.env.OPERATIONS_TABLE || 'locker-dev-operations-dynamodb';
 const BOOKING_TABLE = process.env.BOOKING_TABLE || 'locker-dev-booking';
+const LOCKER_DEVICE_STATE_TABLE = process.env.LOCKER_DEVICE_STATE_TABLE || 'locker-dev-device-state';
  
 // ─── Operations table ───
  
@@ -152,20 +153,14 @@ export const updateBookingExtendPayment = async (
   }));
 };
 
-export const getLockerDeviceState = async (
-  lockerBoxId: string,
-): Promise<{ lockStatus: LockStatus; doorStatus: DoorStatus } | null> => {
+// ─── Locker device state (sensor source of truth) ───
+
+export const getLockerDeviceState = async (lockerBoxId: string): Promise<LockerDeviceState | null> => {
   const result = await docClient.send(new GetCommand({
-    TableName: LOCKER_CACHE_TABLE,
+    TableName: LOCKER_DEVICE_STATE_TABLE,
     Key: { lockerBoxId },
   }));
-
-  if (!result.Item) return null;
-
-  return {
-    lockStatus: result.Item.lockStatus as LockStatus,
-    doorStatus: result.Item.doorStatus as DoorStatus,
-  };
+  return (result.Item as LockerDeviceState) || null;
 };
 
 export const updateLockerDeviceState = async (
@@ -174,13 +169,38 @@ export const updateLockerDeviceState = async (
   doorStatus: DoorStatus,
 ) => {
   await docClient.send(new UpdateCommand({
-    TableName: LOCKER_CACHE_TABLE,
+    TableName: LOCKER_DEVICE_STATE_TABLE,
     Key: { lockerBoxId },
-    UpdateExpression: 'SET lockStatus = :lockStatus, doorStatus = :doorStatus',
+    UpdateExpression: 'SET lockStatus = :lock, doorStatus = :door, lastSensorReportAt = :now, sensorVersion = sensorVersion + :inc',
     ExpressionAttributeValues: {
-      ':lockStatus': lockStatus,
-      ':doorStatus': doorStatus,
+      ':lock': lockStatus,
+      ':door': doorStatus,
+      ':now': new Date().toISOString(),
+      ':inc': 1,
     },
+  }));
+};
+
+export const deleteLockerDeviceState = async (lockerBoxId: string): Promise<void> => {
+  await docClient.send(new DeleteCommand({
+    TableName: LOCKER_DEVICE_STATE_TABLE,
+    Key: { lockerBoxId },
+  }));
+};
+
+export const initLockerDeviceState = async (lockerBoxId: string, stationId: string): Promise<void> => {
+  await docClient.send(new PutCommand({
+    TableName: LOCKER_DEVICE_STATE_TABLE,
+    Item: {
+      lockerBoxId,
+      stationId,
+      lockStatus: 'LOCKED',
+      doorStatus: 'CLOSED',
+      isOnline: true,
+      lastSensorReportAt: new Date().toISOString(),
+      sensorVersion: 0,
+    } satisfies LockerDeviceState,
+    ConditionExpression: 'attribute_not_exists(lockerBoxId)',
   }));
 };
 
