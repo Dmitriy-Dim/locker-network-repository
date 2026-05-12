@@ -380,15 +380,22 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             }))
         );
 
+        const cachedLockers = await loadCachedLockersByStationId(station.stationId, station.lockers.length);
+        const cachedLockersMap = new Map(cachedLockers.map((item) => [item.lockerBoxId, item]));
+
         const lockers: StationCacheLockerDto[] = station.lockers.map((locker) => ({
+            ...(cachedLockersMap.get(locker.lockerBoxId)
+                ? {
+                    status: cachedLockersMap.get(locker.lockerBoxId)!.status,
+                    techStatus: locker.techStatus,
+                    version: cachedLockersMap.get(locker.lockerBoxId)!.version,
+                    lastStatusChangedAt: cachedLockersMap.get(locker.lockerBoxId)!.lastStatusChangedAt,
+                }
+                : fallbackLockerState(locker)),
             lockerBoxId: locker.lockerBoxId,
             stationId: locker.stationId,
             code: locker.code,
             size: locker.size,
-            status: locker.status,
-            techStatus: locker.techStatus,
-            version: locker.version,
-            lastStatusChangedAt: locker.lastStatusChangedAt.toISOString(),
             pricePerHour: pricingMap.get(`${station.cityId}-${locker.size}`) ?? null,
         }));
 
@@ -400,7 +407,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             longitude: station.longitude,
             status: station.status,
             version: stationProjectionVersion(station.updatedAt, station.version),
-            availableLockers: station.lockers.length,
+            availableLockers: lockers.filter((locker) => locker.status === "AVAILABLE" && locker.techStatus === "ACTIVE").length,
             city: {
                 code: station.city.code,
                 name: station.city.name,
@@ -431,7 +438,16 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             return null;
         }
 
-        return buildLockerProjectionFromRds(locker);
+        const projection = buildLockerProjectionFromRds(locker);
+        const cachedLocker = await loadCachedLockerById(lockerBoxId);
+        const runtimeState = cachedLocker ?? fallbackLockerState(locker);
+
+        return {
+            ...projection,
+            status: runtimeState.status,
+            version: runtimeState.version,
+            lastStatusChangedAt: runtimeState.lastStatusChangedAt,
+        };
     }
 
     async getAllStationCacheProjections(tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto[]> {
@@ -614,18 +630,22 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             }
         });
 
+        const cachedLockers = await loadAllCachedLockers();
+        const cachedLockersMap = new Map(cachedLockers.map((item) => [item.lockerBoxId, item]));
+
         return lockers.map((locker) => {
             const projection = buildLockerProjectionFromRds(locker);
+            const runtimeState = cachedLockersMap.get(locker.lockerBoxId) ?? fallbackLockerState(locker);
 
             return {
                 lockerBoxId: projection.lockerBoxId,
                 stationId: projection.stationId,
                 code: projection.code,
                 size: projection.size,
-                status: projection.status,
+                status: runtimeState.status,
                 techStatus: projection.techStatus,
-                version: projection.version,
-                lastStatusChangedAt: projection.lastStatusChangedAt,
+                version: runtimeState.version,
+                lastStatusChangedAt: runtimeState.lastStatusChangedAt,
                 pricePerHour: projection.pricePerHour,
                 station: {
                     address: projection.station.address,
