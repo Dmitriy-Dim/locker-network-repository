@@ -5,6 +5,7 @@ import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 
 import { BookingRecordDto } from "../contracts/booking.dto";
 import { HttpError } from "../errorHandler/HttpError";
+import { logger } from "../Logger/winston";
 import { sendSuccess } from "../utils/response";
 import { env } from "../config/env";
 import {
@@ -189,18 +190,27 @@ export class PaymentService {
                 };
             }
 
-            const booking = existingBooking ?? await tx.booking.create({
-                data: {
-                    bookingId: stagedBooking.bookingId,
-                    userId: stagedBooking.userId,
-                    lockerBoxId: stagedBooking.lockerBoxId,
-                    stationId: stagedBooking.stationId,
-                    status: BookingStatus.ACTIVE,
-                    startTime: paidAt,
-                    expectedEndTime: new Date(stagedBooking.expectedEndTime),
-                    totalPrice: toDecimal(paymentPayload.amount),
-                },
-            });
+            const bookingData = {
+                userId: stagedBooking.userId,
+                lockerBoxId: stagedBooking.lockerBoxId,
+                stationId: stagedBooking.stationId,
+                status: BookingStatus.ACTIVE,
+                startTime: paidAt,
+                expectedEndTime: new Date(stagedBooking.expectedEndTime),
+                totalPrice: toDecimal(paymentPayload.amount),
+            };
+
+            const booking = existingBooking
+                ? await tx.booking.update({
+                    where: { bookingId: stagedBooking.bookingId },
+                    data: bookingData,
+                })
+                : await tx.booking.create({
+                    data: {
+                        bookingId: stagedBooking.bookingId,
+                        ...bookingData,
+                    },
+                });
 
             const payment = await tx.payment.create({
                 data: {
@@ -230,8 +240,22 @@ export class PaymentService {
                 },
             });
 
+            logger.info("Payment finalized booking in RDS", {
+                bookingId: stagedBooking.bookingId,
+                lockerBoxId: stagedBooking.lockerBoxId,
+                paymentSessionId: paymentPayload.paymentSessionId,
+                providerPaymentId: paymentPayload.providerPaymentId,
+                amount: paymentPayload.amount,
+                currency: paymentPayload.currency,
+                created: !existingBooking,
+                previousStatus: existingBooking?.status,
+                persistedStatus: booking.status,
+                sourceOfTruth: "dynamodb",
+                target: "postgres",
+            });
+
             return {
-                created: true,
+                created: !existingBooking,
                 booking,
                 payment,
             };
