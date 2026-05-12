@@ -29,12 +29,22 @@ function toPublicBookingResponse(input: {
     stationId: string;
     startTime: Date | string | null;
     expectedEndTime: Date | string | null;
+    expiresAt?: Date | string | null;
 }) {
+    const isReservedBooking = input.bookingStatus === BookingStatus.PENDING || input.lockerStatus === "RESERVED";
+
     return {
         bookingId: input.bookingId,
         paymentStatus: input.paymentStatus,
         bookingStatus: input.bookingStatus,
         ...(input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
+        ...(isReservedBooking && input.expiresAt
+            ? {
+                expiresAt: input.expiresAt instanceof Date
+                    ? input.expiresAt.toISOString()
+                    : input.expiresAt,
+            }
+            : {}),
         lockerBoxId: input.lockerBoxId,
         stationId: input.stationId,
         startTime: input.startTime instanceof Date
@@ -222,6 +232,7 @@ export class BookingService {
             stationId: booking.stationId,
             startTime: booking.startTime ?? null,
             expectedEndTime: booking.expectedEndTime,
+            expiresAt: booking.expiresAt ?? null,
         }));
     }
 
@@ -770,6 +781,7 @@ export class BookingService {
                     stationId: booking.stationId,
                     startTime: booking.startTime ?? null,
                     expectedEndTime: booking.expectedEndTime ?? null,
+                    expiresAt: booking.expiresAt ?? null,
                 });
             })
         );
