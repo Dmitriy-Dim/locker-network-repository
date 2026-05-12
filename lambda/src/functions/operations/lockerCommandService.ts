@@ -1,6 +1,6 @@
 import { LockerCommand, LockerBatchCommand, OperationType, OperationStatus } from '../../types/contracts/OperationContracts';
 import { LockerErrorCode, LockStatus, DoorStatus } from '../../types/contracts/LockerContracts';
-import { updateOperationWithResult, getLockerDeviceState, updateLockerDeviceState, getBooking } from '../../db/dynamodb';
+import { updateOperationWithResult, getLockerDeviceState, updateLockerDeviceState, getBooking, getLockerCache, updateLockerStatus } from '../../db/dynamodb';
 import { simulateDeviceCommand } from './lockerDeviceSimulator';
 
 const MAX_ATTEMPTS = 3;
@@ -289,6 +289,11 @@ export const handleLockerOpenBatch = async (command: LockerBatchCommand): Promis
       const { success, lockStatus, doorStatus, errorCode, errorMessage } = await runOpenAttempts(lockerBoxId);
 
       if (success) {
+        const cachedLocker = await getLockerCache(lockerBoxId);
+        if (cachedLocker?.status === 'EXPIRED') {
+          await updateLockerStatus(lockerBoxId, 'AVAILABLE');
+          console.log(JSON.stringify({ action: 'LOCKER_RELEASED_AFTER_EXPIRY', operationId, lockerBoxId }));
+        }
         opened.push({ lockerBoxId, lockStatus, doorStatus });
       } else {
         failed.push({
@@ -341,5 +346,94 @@ export const handleLockerOpenBatch = async (command: LockerBatchCommand): Promis
       timestamp: new Date().toISOString(),
     });
     console.error(JSON.stringify({ action: 'LOCKER_OPEN_BATCH_EXCEPTION', operationId, stationId, error: msg }));
+  }
+};
+
+export const handleLockerCloseBatch = async (command: LockerBatchCommand): Promise<void> => {
+  const { operationId, payload } = command;
+  const { actorId, stationId, mode, lockerBoxIds, status: filterStatus } = payload;
+
+  console.log(JSON.stringify({ action: 'LOCKER_CLOSE_BATCH_START', operationId, stationId, actorId, mode, total: lockerBoxIds.length }));
+
+  const closed: { lockerBoxId: string; lockStatus: LockStatus; doorStatus: DoorStatus; released: boolean }[] = [];
+  const failed: { lockerBoxId: string; lockStatus: string; doorStatus: string; errorCode: LockerErrorCode; errorMessage: string }[] = [];
+
+  try {
+    for (const lockerBoxId of lockerBoxIds) {
+      const deviceState = await getLockerDeviceState(lockerBoxId);
+
+      if (!deviceState || deviceState.lockStatus !== 'UNLOCKED' || deviceState.doorStatus !== 'OPEN') {
+        failed.push({
+          lockerBoxId,
+          lockStatus: deviceState?.lockStatus ?? 'UNKNOWN',
+          doorStatus: deviceState?.doorStatus ?? 'UNKNOWN',
+          errorCode: LockerErrorCode.LOCKER_STATE_INVALID,
+          errorMessage: 'Locker is not in expected state for closing',
+        });
+        continue;
+      }
+
+      const { success, lockStatus, doorStatus, errorCode, errorMessage } = await runCloseAttempts(lockerBoxId);
+
+      if (success) {
+        const cachedLocker = await getLockerCache(lockerBoxId);
+        const wasExpired = cachedLocker?.status === 'EXPIRED';
+        if (wasExpired) {
+          await updateLockerStatus(lockerBoxId, 'AVAILABLE');
+          console.log(JSON.stringify({ action: 'LOCKER_RELEASED_AFTER_EXPIRY', operationId, lockerBoxId }));
+        }
+        closed.push({ lockerBoxId, lockStatus, doorStatus, released: wasExpired });
+      } else {
+        failed.push({
+          lockerBoxId,
+          lockStatus,
+          doorStatus,
+          errorCode: errorCode ?? LockerErrorCode.CLOSE_ATTEMPTS_EXHAUSTED,
+          errorMessage: errorMessage ?? 'Locker failed to close after 3 attempts',
+        });
+      }
+    }
+
+    const result = {
+      mode,
+      ...(filterStatus && { status: filterStatus }),
+      total: lockerBoxIds.length,
+      closed,
+      failed,
+      closedCount: closed.length,
+      releasedCount: closed.filter(l => l.released).length,
+      failedCount: failed.length,
+    };
+
+    if (closed.length > 0) {
+      await updateOperationWithResult(operationId, OperationStatus.SUCCESS, {
+        type: OperationType.LOCKER_CLOSE_BATCH,
+        stationId,
+        result,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_BATCH_SUCCESS', operationId, stationId, closedCount: closed.length, releasedCount: result.releasedCount, failedCount: failed.length }));
+    } else {
+      await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+        type: OperationType.LOCKER_CLOSE_BATCH,
+        stationId,
+        result,
+        errorCode: LockerErrorCode.BATCH_CLOSE_FAILED,
+        errorMessage: 'No lockers were closed',
+        timestamp: new Date().toISOString(),
+      });
+      console.log(JSON.stringify({ action: 'LOCKER_CLOSE_BATCH_FAILED', operationId, stationId, failedCount: failed.length }));
+    }
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unexpected error';
+    await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+      type: OperationType.LOCKER_CLOSE_BATCH,
+      stationId,
+      errorCode: LockerErrorCode.DEVICE_SIMULATION_FAILED,
+      errorMessage: msg,
+      timestamp: new Date().toISOString(),
+    });
+    console.error(JSON.stringify({ action: 'LOCKER_CLOSE_BATCH_EXCEPTION', operationId, stationId, error: msg }));
   }
 };
