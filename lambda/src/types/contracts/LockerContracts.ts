@@ -1,6 +1,19 @@
 export type LockStatus = 'LOCKED' | 'UNLOCKED';
 export type DoorStatus = 'OPEN' | 'CLOSED';
 
+export interface LockerDeviceState {
+  lockerBoxId: string;
+  stationId: string;
+  lockStatus: LockStatus;
+  doorStatus: DoorStatus;
+  isOnline: boolean;
+  lastSensorReportAt: string;
+  sensorVersion: number;
+  lastCommandAt?: string;
+  lastCommandType?: string;
+  batteryLevel?: number;
+}
+
 export enum LockerErrorCode {
   // Validation errors (checked by backend before SQS, may also surface in Lambda)
   BOOKING_NOT_FOUND = 'BOOKING_NOT_FOUND',
