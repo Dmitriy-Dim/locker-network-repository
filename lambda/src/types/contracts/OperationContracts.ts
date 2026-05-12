@@ -9,6 +9,7 @@ export enum OperationType {
   LOCKER_OPEN = 'LOCKER_OPEN',
   LOCKER_CLOSE = 'LOCKER_CLOSE',
   LOCKER_OPEN_BATCH = 'LOCKER_OPEN_BATCH',
+  LOCKER_CLOSE_BATCH = 'LOCKER_CLOSE_BATCH',
 }
 
 export enum OperationStatus {
@@ -69,6 +70,6 @@ export interface LockerBatchCommandPayload {
 
 export interface LockerBatchCommand {
   operationId: string;
-  type: OperationType.LOCKER_OPEN_BATCH;
+  type: OperationType.LOCKER_OPEN_BATCH | OperationType.LOCKER_CLOSE_BATCH;
   payload: LockerBatchCommandPayload;
 }
