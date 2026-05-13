@@ -458,7 +458,7 @@ export class DeviceService {
                         statusCode: 202,
                         body: toQueuedDeviceOperationResponse(
                             operationId,
-                            OperationType.LOCKER_OPEN_BATCH,
+                            OperationType.LOCKER_CLOSE_BATCH,
                             undefined,
                             "Batch locker close operation created"
                         ),
