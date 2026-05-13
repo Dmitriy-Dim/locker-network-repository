@@ -19,6 +19,7 @@ import {
 import { getAllBookings, getAllUserBookings, getBooking, getLockerCache } from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
 import { prismaService } from "./prismaService";
+import {getPaymentByBookingId} from "../controllers/bookingController";
 
 const MIN_BOOKING_DURATION_MS = 5 * 60 * 1000;
 
@@ -1254,6 +1255,20 @@ export class BookingService {
 
             throw error;
         }
+    }
+
+    async getPaymentByBookingId(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const payment = await prismaService.booking.findUnique({
+            where: {bookingId},
+            select:{
+                payments: true,
+            }
+        })
+        if (!payment) {
+            throw new HttpError(404, `Booking not found`);
+        }
+        return sendSuccess(res, payment);
     }
 }
 

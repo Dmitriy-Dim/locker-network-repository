@@ -9,3 +9,19 @@ export const stripeWebhook = async (req: Request, res: Response, next: NextFunct
         next(error);
     }
 };
+
+export const getAllPayments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await paymentService.getAllPayments(req, res);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getOnePayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await paymentService.getOnePayment(req, res);
+    } catch (error) {
+        next(error);
+    }
+};

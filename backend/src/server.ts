@@ -23,7 +23,7 @@ import { paymentsRoutes } from "./routes/paymentsRoutes";
 import { logSecurityEvent, SecurityEventType } from "./services/securityEventService";
 import { sendError } from "./utils/response";
 import { citiesRoutes } from './routes/citiesRoutes';
-import {adminRoutes} from "./routes/adminRoutes";
+import {adminPaymentsRoutes, adminRoutes} from "./routes/adminRoutes";
 import {pricingRoutes} from "./routes/pricingRoutes";
 import {devicesRoutes} from "./routes/deviceRoutes";
 import {securityAlertRoutes} from "./routes/securityAlertRoutes";
@@ -172,6 +172,7 @@ export const createApp = () => {
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
     app.use(`${API_PREFIX}/admin/users`, adminRoutes)
     app.use(`${API_PREFIX}/admin/security-alerts`, securityAlertRoutes)
+    app.use(`${API_PREFIX}/admin/payments`, adminPaymentsRoutes);
     app.use(`${API_PREFIX}/operator/security-alerts`, securityAlertRoutes)
     app.use(`${API_PREFIX}/admin/audit-logs`, auditLogRoutes)
     app.use(`${API_PREFIX}/pricing`, pricingRoutes);

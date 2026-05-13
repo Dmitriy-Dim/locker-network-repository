@@ -26,3 +26,4 @@ bookingsRoutes.post("/:id/cancel", authorize(Role.USER, Role.ADMIN), validateReq
 bookingsRoutes.post("/:id/end", authorize(Role.USER, Role.ADMIN), validateRequest(oneBookingSchema), bookingController.endBooking);
 bookingsRoutes.get("/:id", authorize(Role.USER, Role.OPERATOR, Role.ADMIN), validateRequest(oneBookingSchema), bookingController.getBooking);
 bookingsRoutes.post("/:id/extend", authorize(Role.USER), validateRequest(extendBookingSchema), bookingController.extendBooking);
+bookingsRoutes.get('/:id/payments', authorize(Role.ADMIN), bookingController.getPaymentByBookingId);

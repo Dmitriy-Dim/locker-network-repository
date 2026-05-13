@@ -81,3 +81,11 @@ export const endBooking = async (req: Request, res: Response, next: NextFunction
         next(e);
     }
 };
+
+export const getPaymentByBookingId = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.getPaymentByBookingId(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
