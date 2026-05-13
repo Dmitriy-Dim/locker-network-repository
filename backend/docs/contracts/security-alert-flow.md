@@ -47,8 +47,8 @@ Current backend account setup:
 Security alerts now exist in the backend stdout log stream and can be selected by CloudWatch Logs Insights queries or CloudWatch Metric Filters.
 
 - Shared emitter: `backend/src/utils/securityAlert.ts`
-- Admin CloudWatch Logs Insights API: `GET /api/v1/admin/security-alerts`
-- Backward-compatible alias: `GET /api/v1/admin/security-alerts/cloudwatch`
+- Admin CloudWatch Logs Insights API: `GET /api/v1/admin/security-alerts/cloudwatch`
+- Operator CloudWatch Logs Insights API: `GET /api/v1/operator/security-alerts/cloudwatch`
 - Auth/rate-limit producer: `backend/src/services/securityEventService.ts`
 - Backend error producer: `backend/src/errorHandler/errorHandler.ts`
 - Process lifecycle producer: `backend/src/app.ts`
@@ -422,8 +422,7 @@ Backend:
 
 - Done: add `SECURITY_ALERT` stdout emitter with `category`, `schemaVersion`, `severity`, `source`, and `environment`.
 - Done: stop persisting backend alerts to RDS `SecurityAlert`.
-- Done: make `GET /api/v1/admin/security-alerts` read CloudWatch Logs Insights.
-- Done: keep `GET /api/v1/admin/security-alerts/cloudwatch` as a compatibility alias.
+- Done: make `GET /api/v1/admin/security-alerts/cloudwatch` and `GET /api/v1/operator/security-alerts/cloudwatch` read CloudWatch Logs Insights.
 - Done: emit auth/rate-limit alerts directly to CloudWatch stdout logs.
 - Done: add `INTERNAL_SERVER_ERROR` alerting in `errorHandler`.
 - Done: add startup/crash/AWS credentials alert logs in `app.ts`.
