@@ -6,6 +6,8 @@ export type Operation = {
     status: OperationStatus,
     errorMessage?: string,
     result?: Record<string, unknown>,
+    bookingId?: string,
+    lockerBoxId?: string,
 }
 
 export enum OperationStatus {
@@ -28,6 +30,7 @@ export enum OperationType {
     LOCKER_CLOSE = "LOCKER_CLOSE",
     LOCKER_OPEN_BATCH = "LOCKER_OPEN_BATCH",
     LOCKER_CLOSE_BATCH = "LOCKER_CLOSE_BATCH",
+    BOOKING_END = "BOOKING_END",
 }
 
 export enum ActionType {
@@ -67,6 +70,8 @@ export enum ActionType {
     BOOKING_INFO_FAILED = 'BOOKING_INFO_FAILED',
     BOOKING_CANCEL = 'BOOKING_CANCEL',
     BOOKING_CANCEL_FAILED = 'BOOKING_CANCEL_FAILED',
+    BOOKING_END = 'BOOKING_END',
+    BOOKING_END_FAILED = 'BOOKING_END_FAILED',
     BOOKING_EXPIRE = "BOOKING_EXPIRE",
     BOOKING_EXPIRE_FAILED = "BOOKING_EXPIRE_FAILED",
     BOOKING_UPDATE_STATUS = 'BOOKING_UPDATE_STATUS',
