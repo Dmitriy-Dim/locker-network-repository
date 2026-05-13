@@ -52,14 +52,14 @@ export default function DashboardLayout() {
         if(user?.role === ROLES.OPERATOR){
             return [
                 { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
-                { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
+                { text: 'Active Alerts', path: Paths.ALERTS_OPERATOR, icon: <NotificationsIcon /> },
             ];
         }
 
         if(user?.role === ROLES.ADMIN){
             return [
                 { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
-                { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
+                { text: 'Active Alerts', path: Paths.ALERTS_ADMIN, icon: <NotificationsIcon /> },
                 { text: 'Users', path: dashboardPath+"/users", icon: <DashboardIcon /> },
                 { text: 'Pricing', path: Paths.PRICING_ADMIN, icon: <AttachMoneyIcon /> },
             ];
