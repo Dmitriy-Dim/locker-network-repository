@@ -443,7 +443,7 @@ export class PaymentService {
         const ttl = typeof stagedBooking.ttl === "number" ? stagedBooking.ttl : undefined;
         const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
-        if (ttl !== undefined && ttl < nowEpochSeconds) {
+        if (paymentPayload.paymentFlow === "BOOKING_INIT" && ttl !== undefined && ttl < nowEpochSeconds) {
             emitPaymentAlert(
                 req,
                 "PAYMENT_BOOKING_EXPIRED",

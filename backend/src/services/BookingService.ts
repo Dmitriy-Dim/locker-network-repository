@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { BookingStatus, Prisma, Role } from "@prisma/client";
+import { BookingStatus, LockerStatus, Prisma, Role, StationStatus, TechnicalStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 
 import { BookingInitRequestDto, BookingRecordDto } from "../contracts/booking.dto";
@@ -11,15 +11,16 @@ import { sendSuccess } from "../utils/response";
 
 import {ActionType, OperationStatus, OperationType} from "./dto/operationDto";
 import {
-    sendBookingCancelToQueue,
+    sendBookingCancelToQueue, sendBookingEndToQueue,
     sendBookingExtendToQueue,
     sendBookingInitToQueue,
     sendBookingStatusUpdateToQueue,
-    sendCloseLockerUserCommand
 } from "./sqsService";
-import { getAllBookings, getBooking, getLockerCache } from "./dynamoService";
+import { getAllBookings, getAllUserBookings, getBooking, getLockerCache } from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
 import { prismaService } from "./prismaService";
+
+const MIN_BOOKING_DURATION_MS = 5 * 60 * 1000;
 
 function toPublicBookingResponse(input: {
     bookingId: string;
@@ -35,14 +36,24 @@ function toPublicBookingResponse(input: {
     expiresAt?: Date | string | null;
 }) {
     const isReservedBooking = input.bookingStatus === BookingStatus.PENDING || input.lockerStatus === "RESERVED";
+    const hiddenLockerDetailStatuses = new Set<string>([
+        BookingStatus.ENDED,
+        BookingStatus.FAILED,
+        BookingStatus.CANCELLED,
+    ]);
+    const shouldExposeLockerDetails = !hiddenLockerDetailStatuses.has(input.bookingStatus)
+        && (
+            input.bookingStatus !== BookingStatus.EXPIRED
+            || input.lockerStatus === "EXPIRED"
+        );
 
     return {
         bookingId: input.bookingId,
         paymentStatus: input.paymentStatus,
         bookingStatus: input.bookingStatus,
-        ...(input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
-        ...(input.lockerCode ? { code: input.lockerCode} : {}),
-        ...(input.stationAddress !== undefined
+        ...(shouldExposeLockerDetails && input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
+        ...(shouldExposeLockerDetails && input.lockerCode ? { code: input.lockerCode} : {}),
+        ...(shouldExposeLockerDetails && input.stationAddress !== undefined
             ? {stationAddress: input.stationAddress}
             : {}),
         ...(isReservedBooking && input.expiresAt
@@ -52,7 +63,7 @@ function toPublicBookingResponse(input: {
                     : input.expiresAt,
             }
             : {}),
-        lockerBoxId: input.lockerBoxId,
+        ...(shouldExposeLockerDetails ? { lockerBoxId: input.lockerBoxId } : {}),
         stationId: input.stationId,
         startTime: input.startTime instanceof Date
             ? input.startTime.toISOString()
@@ -113,16 +124,6 @@ async function loadBookingWithLockerStatus(bookingId: string) {
     };
 }
 
-const CANCELLABLE_BOOKING_STATUSES = new Set<string>([
-    BookingStatus.PENDING,
-    BookingStatus.ACTIVE,
-    BookingStatus.EXPIRED,
-]);
-
-function isCancellableBookingStatus(status: string) {
-    return CANCELLABLE_BOOKING_STATUSES.has(status);
-}
-
 function parseOptionalDate(value: unknown) {
     if (typeof value !== "string" || value.length === 0) {
         return undefined;
@@ -136,6 +137,62 @@ function resolveDynamoBookingStatus(status: string) {
     return Object.values(BookingStatus).includes(status as BookingStatus)
         ? status as BookingStatus
         : undefined;
+}
+
+function assertBookingExpectedEndTime(expectedEndTime: string) {
+    const endTime = new Date(expectedEndTime);
+
+    if (Number.isNaN(endTime.getTime())) {
+        throw new HttpError(400, "expectedEndTime must be a valid ISO datetime", "VALIDATION_ERROR");
+    }
+
+    if (endTime.getTime() < Date.now() + MIN_BOOKING_DURATION_MS) {
+        throw new HttpError(
+            400,
+            "expectedEndTime must be at least 5 minutes in the future",
+            "VALIDATION_ERROR"
+        );
+    }
+}
+
+async function assertBookingCatalogAvailability(input: {
+    stationId: string;
+    size: "S" | "M" | "L";
+}) {
+    const station = await prismaService.lockerStation.findUnique({
+        where: { stationId: input.stationId },
+        select: {
+            stationId: true,
+            status: true,
+            isDeleted: true,
+        },
+    });
+
+    if (!station || station.isDeleted) {
+        throw new HttpError(404, "Station not found");
+    }
+
+    if (station.status !== StationStatus.ACTIVE) {
+        throw new HttpError(409, "Station is not active");
+    }
+
+    const availableLockerCount = await prismaService.lockerBox.count({
+        where: {
+            stationId: input.stationId,
+            size: input.size,
+            status: LockerStatus.AVAILABLE,
+            techStatus: TechnicalStatus.ACTIVE,
+            isDeleted: false,
+            station: {
+                status: StationStatus.ACTIVE,
+                isDeleted: false,
+            },
+        },
+    });
+
+    if (availableLockerCount === 0) {
+        throw new HttpError(409, `No available active ${input.size} locker at station ${input.stationId}`);
+    }
 }
 
 export class BookingService {
@@ -154,6 +211,13 @@ export class BookingService {
 
                 const operationId = uuidv4();
                 const body = req.body as BookingInitRequestDto;
+
+                assertBookingExpectedEndTime(body.expectedEndTime);
+
+                await assertBookingCatalogAvailability({
+                    stationId: body.stationId,
+                    size: body.size,
+                });
 
                 try {
                     await operationRepository.create({
@@ -642,6 +706,10 @@ export class BookingService {
         const userId = req.user?.userId;
         const role = req.user?.role;
 
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
         if (role === Role.USER && booking.userId !== userId) {
             throw new HttpError(403, "Access denied");
         }
@@ -655,12 +723,12 @@ export class BookingService {
             });
         }
 
-        if (!isCancellableBookingStatus(booking.status)) {
+        if (booking.status !== BookingStatus.PENDING) {
             throw new HttpError(409, `Cannot cancel booking with status ${booking.status}`);
         }
 
-        if (!userId) {
-            throw new HttpError(401, "Unauthorized");
+        if (booking.paymentStatus === "PAID") {
+            throw new HttpError(409, "Only unpaid pending bookings can be cancelled; use end booking for paid bookings");
         }
 
         return idempotencyService.execute<Record<string, unknown>>(
@@ -670,7 +738,6 @@ export class BookingService {
             { bookingId },
             async () => {
                 const operationId = uuidv4();
-                let operationCreated = false;
 
                 try {
                     const existingRdsBooking = await prismaService.booking.findUnique({
@@ -696,12 +763,8 @@ export class BookingService {
                         };
                     }
 
-                    if (existingRdsBooking && !isCancellableBookingStatus(existingRdsBooking.status)) {
-                        throw new HttpError(409, `Cannot cancel booking with status ${existingRdsBooking.status}`);
-                    }
-
-                    if (!existingRdsBooking && booking.status !== BookingStatus.PENDING) {
-                        throw new HttpError(409, "Booking is not finalized in RDS yet");
+                    if (existingRdsBooking) {
+                        throw new HttpError(409, "Booking is already finalized; use end booking for paid bookings");
                     }
 
                     await operationRepository.create({
@@ -711,26 +774,13 @@ export class BookingService {
                         status: OperationStatus.PENDING,
                         type: OperationType.BOOKING_CANCEL,
                     });
-                    operationCreated = true;
 
-                    const updated = existingRdsBooking
-                        ? await prismaService.booking.update({
-                            where: { bookingId },
-                            data: {
-                                status: BookingStatus.CANCELLED,
-                                endTime: new Date(),
-                            },
-                        })
-                        : undefined;
-
-                    logger.info("Booking cancellation RDS state prepared", {
+                    logger.info("Unpaid booking cancellation prepared", {
                         operationId,
                         actorId: userId,
                         bookingId,
                         previousDynamoStatus: booking.status,
-                        previousRdsStatus: existingRdsBooking?.status,
-                        persistedStatus: updated?.status,
-                        sourceOfTruth: existingRdsBooking ? "postgres-localstack-sync" : "lambda-dynamodb",
+                        sourceOfTruth: "lambda-dynamodb",
                     });
 
                     await sendBookingCancelToQueue({
@@ -775,7 +825,6 @@ export class BookingService {
                             {
                                 bookingId,
                                 requestedStatus: BookingStatus.CANCELLED,
-                                ...(updated ? { persistedStatus: updated.status } : {}),
                             },
                             "Booking cancellation queued"
                         ),
@@ -787,9 +836,6 @@ export class BookingService {
 
                     const errorMessage = error instanceof Error ? error.message : "Failed to queue booking cancel";
 
-                    if (operationCreated) {
-                        await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
-                    }
                     logger.error("Booking cancellation queueing failed", {
                         operationId,
                         actorId: userId,
@@ -831,6 +877,10 @@ export class BookingService {
         const userId = req.user?.userId;
         const role = req.user?.role;
 
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
         if (role === Role.USER && booking.userId !== userId) {
             throw new HttpError(403, "Access denied");
         }
@@ -864,14 +914,6 @@ export class BookingService {
             throw new HttpError(409, "Booking does not have expectedEndTime");
         }
 
-        if (existing.expectedEndTime <= new Date()) {
-            throw new HttpError(409, "Booking has expired");
-        }
-
-        if (!userId) {
-            throw new HttpError(401, "Unauthorized");
-        }
-
         return idempotencyService.execute(
             req,
             res,
@@ -881,6 +923,25 @@ export class BookingService {
                 const operationId = uuidv4();
 
                 try {
+                    logger.info("Booking end close requested", {
+                        operationId,
+                        actorId: userId,
+                        bookingId,
+                        previousStatus: existing.status,
+                        previousLockerStatus: lockerStatus,
+                        sourceOfTruth: "postgres",
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_END,
+                        bookingId,
+                        lockerBoxId: booking.lockerBoxId
+                    });
+
                     const updated = await prismaService.booking.update({
                         where: { bookingId },
                         data: {
@@ -889,29 +950,11 @@ export class BookingService {
                         },
                     });
 
-                    logger.info("Booking end RDS state updated", {
-                        operationId,
-                        actorId: userId,
-                        bookingId,
-                        previousStatus: existing.status,
-                        persistedStatus: updated.status,
-                        previousLockerStatus: lockerStatus,
-                        sourceOfTruth: "postgres-localstack-sync",
-                    });
-
-                    await operationRepository.create({
-                        operationId,
-                        userId,
-                        timestamp: new Date().toISOString(),
-                        status: OperationStatus.PENDING,
-                        type: OperationType.LOCKER_CLOSE,
-                    });
-
                     const requestedAt = new Date().toISOString();
 
-                    await sendCloseLockerUserCommand({
+                    await sendBookingEndToQueue({
                         operationId,
-                        type: OperationType.LOCKER_CLOSE,
+                        type: OperationType.BOOKING_END,
                         payload: {
                             userId,
                             stationId: booking.stationId,
@@ -919,7 +962,6 @@ export class BookingService {
                             bookingId,
                             clientRequestId: (req.headers["x-correlation-id"] as string | undefined) ?? uuidv4(),
                             requestedAt,
-                            finalizeBooking: true,
                         },
                     });
 
@@ -930,21 +972,23 @@ export class BookingService {
                         lockerBoxId: booking.lockerBoxId,
                         stationId: booking.stationId,
                         previousStatus: existing.status,
+                        requestedStatus: BookingStatus.ENDED,
                         persistedStatus: updated.status,
                     });
 
                     await logAudit({
                         req,
-                        action: ActionType.BOOKING_UPDATE_STATUS,
+                        action: ActionType.BOOKING_END,
                         actorId: userId,
                         entityId: operationId,
                         entityType: "Operation",
                         lockerId: booking.lockerBoxId,
                         details: {
-                            operationType: OperationType.LOCKER_CLOSE,
+                            operationType: OperationType.BOOKING_END,
                             bookingId,
                             previousStatus: existing.status,
                             nextStatus: BookingStatus.ENDED,
+                            persistedStatus: updated.status,
                             previousLockerStatus: lockerStatus,
                             sourceOfTruth: "postgres-localstack-sync",
                         },
@@ -954,11 +998,12 @@ export class BookingService {
                         statusCode: 202,
                         body: toQueuedBookingOperationResponse(
                             operationId,
-                            OperationType.LOCKER_CLOSE,
+                            OperationType.BOOKING_END,
                             {
                                 bookingId,
                                 lockerBoxId: booking.lockerBoxId,
                                 stationId: booking.stationId,
+                                requestedStatus: BookingStatus.ENDED,
                                 persistedStatus: updated.status,
                                 finalClose: true,
                             },
@@ -979,7 +1024,7 @@ export class BookingService {
                     });
                     await logAudit({
                         req,
-                        action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
+                        action: ActionType.BOOKING_END_FAILED,
                         actorId: userId,
                         entityId: bookingId,
                         entityType: "Booking",
@@ -999,21 +1044,20 @@ export class BookingService {
         );
     }
 
-    async getAllBookings(req: Request, res: Response) {
+    async getAllUserBookings(req: Request, res: Response) {
         const userId = req.user?.userId;
 
         if (!userId) {
             throw new HttpError(401, "Unauthorized");
         }
 
-        const allBookings = await getAllBookings() as BookingRecordDto[];
+        const allBookings = await getAllUserBookings(userId) as BookingRecordDto[];
         const status = req.query.status as BookingStatus | undefined;
         const lockerBoxId = req.query.lockerBoxId as string | undefined;
         const stationId = req.query.stationId as string | undefined;
         const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
         const skip = Number(req.query.skip ?? 0);
         const ownBookings = allBookings
-            .filter((booking) => booking.userId === userId)
             .filter((booking) => !status || booking.status === status)
             .filter((booking) => !lockerBoxId || booking.lockerBoxId === lockerBoxId)
             .filter((booking) => !stationId || booking.stationId === stationId);

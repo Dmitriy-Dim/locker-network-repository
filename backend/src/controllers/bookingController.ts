@@ -10,9 +10,9 @@ export const extendBooking = async (req: Request, res: Response, next: NextFunct
     }
 };
 
-export const getAllBookings = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllUserBookings = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await bookingService.getAllBookings(req, res);
+        return await bookingService.getAllUserBookings(req, res);
     } catch (e) {
         next(e);
     }

@@ -21,7 +21,7 @@ bookingsRoutes.get("/admin", authorize(Role.ADMIN), validateRequest(adminBooking
 bookingsRoutes.post("/admin/reconcile-dynamo-rds", authorize(Role.ADMIN), bookingController.reconcileDynamoBookingsToRds);
 bookingsRoutes.get("/admin/:id", authorize(Role.ADMIN), validateRequest(oneBookingSchema), bookingController.getBookingAdmin);
 bookingsRoutes.patch("/admin/:id/status", authorize(Role.ADMIN), validateRequest(bookingStatusChangeSchema), bookingController.updateBookingStatusAdmin);
-bookingsRoutes.get("/my", authorize(Role.USER), validateRequest(myBookingsQuerySchema), bookingController.getAllBookings);
+bookingsRoutes.get("/my", authorize(Role.USER), validateRequest(myBookingsQuerySchema), bookingController.getAllUserBookings);
 bookingsRoutes.post("/:id/cancel", authorize(Role.USER, Role.ADMIN), validateRequest(oneBookingSchema), bookingController.cancelBooking);
 bookingsRoutes.post("/:id/end", authorize(Role.USER, Role.ADMIN), validateRequest(oneBookingSchema), bookingController.endBooking);
 bookingsRoutes.get("/:id", authorize(Role.USER, Role.OPERATOR, Role.ADMIN), validateRequest(oneBookingSchema), bookingController.getBooking);

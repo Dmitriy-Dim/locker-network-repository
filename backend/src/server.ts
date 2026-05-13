@@ -172,6 +172,7 @@ export const createApp = () => {
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
     app.use(`${API_PREFIX}/admin/users`, adminRoutes)
     app.use(`${API_PREFIX}/admin/security-alerts`, securityAlertRoutes)
+    app.use(`${API_PREFIX}/operator/security-alerts`, securityAlertRoutes)
     app.use(`${API_PREFIX}/admin/audit-logs`, auditLogRoutes)
     app.use(`${API_PREFIX}/pricing`, pricingRoutes);
     app.use(`${API_PREFIX}/devices`, devicesRoutes);

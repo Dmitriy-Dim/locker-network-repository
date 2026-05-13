@@ -3,12 +3,12 @@ import {
     ResultField,
     StartQueryCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
-import { Request, Response } from "express";
+import {Request, Response} from "express";
 
-import { env } from "../config/env";
-import { HttpError } from "../errorHandler/HttpError";
-import { sendSuccess } from "../utils/response";
-import { cloudWatchLogsClient } from "../utils/cloudWatchLogsClient";
+import {env} from "../config/env";
+import {HttpError} from "../errorHandler/HttpError";
+import {sendSuccess} from "../utils/response";
+import {cloudWatchLogsClient} from "../utils/cloudWatchLogsClient";
 
 const MAX_CLOUDWATCH_LIMIT = 100;
 const DEFAULT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -122,10 +122,6 @@ function toCloudWatchHttpError(error: unknown, action: "StartQuery" | "GetQueryR
 }
 
 export class SecurityAlertService {
-    static async getStoredAlerts(req: Request, res: Response) {
-        return SecurityAlertService.queryCloudWatchAlerts(req, res);
-    }
-
     static async queryCloudWatchAlerts(req: Request, res: Response) {
         const logGroupNames = getConfiguredLogGroups();
 
