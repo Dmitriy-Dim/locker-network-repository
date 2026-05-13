@@ -71,9 +71,17 @@ export default function DashboardLayout() {
     const drawerContent = (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="h5" fontWeight={900} color="#1e293b">
-                    Smart Locker App
-                </Typography>
+                {/*<Typography variant="h5" fontWeight={900} color="#1e293b">*/}
+                {/*    Smart Locker App*/}
+                {/*</Typography>*/}
+                <Box display="flex" justifyContent="center" mb={3}>
+                    <img
+                        src="/logo_app.png"
+                        alt="logo"
+                        width={200}
+                        height={120}
+                    />
+                </Box>
             </Box>
             <Divider sx={{ mb: 2 }} />
 
