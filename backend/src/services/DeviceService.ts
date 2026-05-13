@@ -316,7 +316,7 @@ export class DeviceService {
 
                 const {mode, stationId, lockerBoxIds, status, clientRequestId, reason} = req.body as {mode: string, stationId: string, lockerBoxIds: string[] | undefined, status: string | undefined, clientRequestId:string, reason:string};
                 const lockers = await findLockers({stationId, mode, status ,lockerBoxIds});
-                if (!lockers) {
+                if (lockers.length === 0) {
                     throw new HttpError(409, "No lockers match operator open filter");
                 }
 
