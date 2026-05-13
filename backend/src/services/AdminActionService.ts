@@ -8,6 +8,7 @@ import {prismaService} from "./prismaService";
 import {ActionType} from "./dto/operationDto";
 import {logSecurityEvent, SecurityEventType} from "./securityEventService";
 import {idempotencyService} from "./IdempotencyService";
+import {sendSuccess} from "../utils/response";
 
 export class AdminActions {
 
@@ -175,7 +176,7 @@ export class AdminActions {
         if (!user) {
             throw new HttpError(404, "User not found");
         }
-        return res.status(200).json(user);
+        return sendSuccess(res,user);
     }
 
     static async deleteUser(req: Request, res: Response) {
