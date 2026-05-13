@@ -91,7 +91,7 @@ async function findLockersByStatus(stationId: string, status: LockerStatus){
         if (!station) throw new HttpError(404, "Station not found");
 
         const lockers = await tx.lockerBox.findMany({
-            where: { stationId, status},
+            where: { stationId},
             select: { lockerBoxId: true },
         });
 
