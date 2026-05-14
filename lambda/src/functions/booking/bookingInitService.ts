@@ -88,6 +88,7 @@ const {
     bookingId,
     operationId,
     userId,
+    GSI1PK: userId,
     stationId,
     lockerBoxId: locker.lockerBoxId,
     size,
