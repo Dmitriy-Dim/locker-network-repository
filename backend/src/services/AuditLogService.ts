@@ -54,7 +54,7 @@ function parseStringFilter(value: unknown) {
     return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function parseDate(value: unknown, fallback: Date, fieldName: string) {
+export function parseDate(value: unknown, fallback: Date, fieldName: string) {
     const rawValue = firstQueryValue(value);
 
     if (typeof rawValue !== "string" || rawValue.trim().length === 0) {

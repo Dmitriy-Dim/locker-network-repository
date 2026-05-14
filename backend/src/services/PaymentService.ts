@@ -1,10 +1,11 @@
 import crypto, { randomUUID } from "crypto";
 
-import { Request, Response } from "express";
-import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
+import {Request, Response} from "express";
+import {BookingStatus, PaymentStatus, Prisma} from "@prisma/client";
 
 import { BookingRecordDto } from "../contracts/booking.dto";
 import { HttpError } from "../errorHandler/HttpError";
+import { logger } from "../Logger/winston";
 import { sendSuccess } from "../utils/response";
 import { env } from "../config/env";
 import {
@@ -18,6 +19,7 @@ import { getBooking } from "./dynamoService";
 import { OperationType } from "./dto/operationDto";
 import { prismaService } from "./prismaService";
 import { sendBookingExtendConfirmToQueue, sendPaymentConfirmToQueue } from "./sqsService";
+import {parseDate} from "./AuditLogService";
 
 type StripeEventObject = {
     id?: string;
@@ -189,18 +191,27 @@ export class PaymentService {
                 };
             }
 
-            const booking = existingBooking ?? await tx.booking.create({
-                data: {
-                    bookingId: stagedBooking.bookingId,
-                    userId: stagedBooking.userId,
-                    lockerBoxId: stagedBooking.lockerBoxId,
-                    stationId: stagedBooking.stationId,
-                    status: BookingStatus.ACTIVE,
-                    startTime: paidAt,
-                    expectedEndTime: new Date(stagedBooking.expectedEndTime),
-                    totalPrice: toDecimal(paymentPayload.amount),
-                },
-            });
+            const bookingData = {
+                userId: stagedBooking.userId,
+                lockerBoxId: stagedBooking.lockerBoxId,
+                stationId: stagedBooking.stationId,
+                status: BookingStatus.ACTIVE,
+                startTime: paidAt,
+                expectedEndTime: new Date(stagedBooking.expectedEndTime),
+                totalPrice: toDecimal(paymentPayload.amount),
+            };
+
+            const booking = existingBooking
+                ? await tx.booking.update({
+                    where: { bookingId: stagedBooking.bookingId },
+                    data: bookingData,
+                })
+                : await tx.booking.create({
+                    data: {
+                        bookingId: stagedBooking.bookingId,
+                        ...bookingData,
+                    },
+                });
 
             const payment = await tx.payment.create({
                 data: {
@@ -230,8 +241,22 @@ export class PaymentService {
                 },
             });
 
+            logger.info("Payment finalized booking in RDS", {
+                bookingId: stagedBooking.bookingId,
+                lockerBoxId: stagedBooking.lockerBoxId,
+                paymentSessionId: paymentPayload.paymentSessionId,
+                providerPaymentId: paymentPayload.providerPaymentId,
+                amount: paymentPayload.amount,
+                currency: paymentPayload.currency,
+                created: !existingBooking,
+                previousStatus: existingBooking?.status,
+                persistedStatus: booking.status,
+                sourceOfTruth: "dynamodb",
+                target: "postgres",
+            });
+
             return {
-                created: true,
+                created: !existingBooking,
                 booking,
                 payment,
             };
@@ -419,7 +444,7 @@ export class PaymentService {
         const ttl = typeof stagedBooking.ttl === "number" ? stagedBooking.ttl : undefined;
         const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
-        if (ttl !== undefined && ttl < nowEpochSeconds) {
+        if (paymentPayload.paymentFlow === "BOOKING_INIT" && ttl !== undefined && ttl < nowEpochSeconds) {
             emitPaymentAlert(
                 req,
                 "PAYMENT_BOOKING_EXPIRED",
@@ -576,6 +601,100 @@ export class PaymentService {
             paymentConfirmedAt,
             eventId: event.id,
         });
+    }
+
+
+    async getAllPayments(req: Request, res: Response) {
+        const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+        const skip = Number(req.query.skip ?? 0);
+        const bookingId = req.query.bookingId as string | undefined;
+        const userId = req.query.userId as string | undefined;
+        const status = req.query.status as PaymentStatus | undefined;
+        const provider = req.query.provider as string | undefined;
+        const providerPaymentId = req.query.providerPaymentId as string | undefined;
+        const from = parseDate(req.query.from, new Date(Date.now() - (24 * 60 * 60 * 1000)), "from");
+        const to = parseDate(req.query.to, new Date(), "to");
+
+
+        const where: Prisma.PaymentWhereInput = {
+            createdAt: {
+                gte: from,
+                lte: to,
+            },
+            ...(bookingId && { bookingId }),
+            ...(status && { status }),
+            ...(provider && { provider }),
+            ...(providerPaymentId && { providerPaymentId }),
+            ...(userId && {
+                booking: {
+                    userId,
+                },
+            }),
+        };
+
+        const payments = await prismaService.payment.findMany({
+            where,
+            select: {
+                paymentId: true,
+                bookingId: true,
+                booking: {
+                    select: {
+                        userId: true,
+                    },
+                },
+                status: true,
+                provider: true,
+                providerPaymentId: true,
+                amount: true,
+                currency:true,
+                createdAt: true,
+                updatedAt: true,
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+            skip,
+            ...(limit !== undefined && {take: limit}),
+        });
+
+
+        const total = await prismaService.payment.count({where});
+
+        res.setHeader("x-total-count", total);
+        res.setHeader("x-skip", skip);
+        if (limit !== undefined) {
+            res.setHeader("x-limit", limit);
+        }
+
+        return sendSuccess(res,payments)
+    }
+
+    async getOnePayment(req: Request, res: Response) {
+        const paymentId = req.params.id as string | undefined;
+        const payment = await prismaService.payment.findUnique({
+            where: {paymentId},
+            select: {
+                paymentId: true,
+                bookingId: true,
+                booking: {
+                    select: {
+                        userId: true,
+                    },
+                },
+                status: true,
+                provider: true,
+                providerPaymentId: true,
+                amount: true,
+                currency:true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        })
+        if (!payment) {
+            throw new HttpError(404, "Payment not found.");
+        }
+
+        return sendSuccess(res, payment);
     }
 }
 

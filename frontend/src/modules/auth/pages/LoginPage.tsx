@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
     Box, Paper, Typography, TextField, Button, Alert, Link, Divider,
-    InputAdornment, IconButton
+    InputAdornment, IconButton,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -109,9 +109,18 @@ export function LoginPage() {
             </Button>
 
             <Paper elevation={0} sx={{ p: { xs: 4, md: 5 }, width: '100%', maxWidth: 450, borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                <Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">
-                    Welcome to Smart Locker App!
-                </Typography>
+                {/*<Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">*/}
+                {/*    Welcome to Smart Locker App!*/}
+                {/*</Typography>*/}
+                <Box display="flex" justifyContent="center" mb={3}>
+                    <img
+                        src="/logo_app.png"
+                        alt="logo"
+                        width={460}
+                        height={240}
+                    />
+                </Box>
+
 
                 <form onSubmit={handleSubmit}>
                     <Box display="flex" flexDirection="column" gap={2.5}>

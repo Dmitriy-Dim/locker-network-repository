@@ -10,9 +10,9 @@ export const extendBooking = async (req: Request, res: Response, next: NextFunct
     }
 };
 
-export const getAllBookings = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllUserBookings = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await bookingService.getAllBookings(req, res);
+        return await bookingService.getAllUserBookings(req, res);
     } catch (e) {
         next(e);
     }
@@ -50,6 +50,14 @@ export const getBookingAdmin = async (req: Request, res: Response, next: NextFun
     }
 };
 
+export const reconcileDynamoBookingsToRds = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.reconcileDynamoBookingsToRds(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
 export const updateBookingStatusAdmin = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await bookingService.updateBookingStatusAdmin(req, res);
@@ -69,6 +77,14 @@ export const cancelBooking = async (req: Request, res: Response, next: NextFunct
 export const endBooking = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await bookingService.endBooking(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const getPaymentByBookingId = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.getPaymentByBookingId(req, res);
     } catch (e) {
         next(e);
     }

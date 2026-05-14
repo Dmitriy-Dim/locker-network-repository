@@ -8,7 +8,7 @@ import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HistoryIcon from '@mui/icons-material/History';
 import PaymentIcon from '@mui/icons-material/Payment';
-import {ActionRequiredLockerCard, ActiveLockerCard, HistoryLockerCard} from "./ActiveLockerCard.tsx";
+import { ActiveLockerCard, HistoryLockerCard, ActionRequiredLockerCard } from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
 
@@ -28,12 +28,11 @@ export default function MyBookingsPage() {
         const history: any[] = [];
 
         safeBookings.forEach((b: any) => {
-
             if (b.bookingStatus === 'PENDING' && b.paymentStatus === 'PENDING') {
+                if (b.expiresAt && new Date(b.expiresAt).getTime() <= now) return;
                 reserved.push(b);
                 return;
             }
-
             if (b.bookingStatus === 'ACTIVE') {
                 const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
                 const isTimeExpired = endTime !== null && endTime <= now;
@@ -44,7 +43,6 @@ export default function MyBookingsPage() {
                 }
                 return;
             }
-
             if (b.bookingStatus === 'EXPIRED') {
                 const endTime = b.expectedEndTime ? new Date(b.expectedEndTime).getTime() : null;
                 const isExpiredLongAgo = endTime !== null && (now - endTime) > EIGHT_HOURS_MS;
@@ -55,6 +53,7 @@ export default function MyBookingsPage() {
                 }
                 return;
             }
+            if (b.bookingStatus === 'CANCELLED' && b.paymentStatus === 'PENDING') return;
             history.push(b);
         });
 

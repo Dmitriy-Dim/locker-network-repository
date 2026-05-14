@@ -622,7 +622,7 @@ If the booking is already cancelled, backend returns `200 OK` with the current b
 
 ### `POST /api/v1/bookings/:id/end`
 
-User or admin can end only an `ACTIVE` booking. Backend updates PostgreSQL status to `ENDED`, stores `endTime`, enqueues `LOCKER_CLOSE` with `finalizeBooking: true`, and returns:
+User or admin can end only an `ACTIVE` booking. Backend creates a pending operation, updates PostgreSQL status to `ENDED`, stores `endTime`, enqueues `BOOKING_END` for lambda locker close/cache cleanup, and returns:
 
 ```json
 {
@@ -631,10 +631,11 @@ User or admin can end only an `ACTIVE` booking. Backend updates PostgreSQL statu
   "data": {
     "operationId": "op_end_001",
     "status": "PENDING",
-    "type": "LOCKER_CLOSE",
+    "type": "BOOKING_END",
     "bookingId": "bk_001",
     "lockerBoxId": "locker_55",
     "stationId": "station_123",
+    "requestedStatus": "ENDED",
     "persistedStatus": "ENDED",
     "finalClose": true,
     "message": "Booking end queued"

@@ -249,6 +249,11 @@ export class CacheSyncService {
     }
 
     async hardRefreshAll(req: Request, res: Response) {
+        logger.info("Catalog hard refresh requested", {
+            actorId: req.user?.userId,
+            correlationId: req.correlationId,
+        });
+
         const {
             stationProjections,
             lockerProjections,
@@ -284,24 +289,31 @@ export class CacheSyncService {
 
         if (stationCacheStatus === "FAILED") {
             logger.error("Station hard refresh finished with Redis write failures", {
+                actorId: req.user?.userId,
+                correlationId: req.correlationId,
                 failedCount: stationResults.filter((result) => result.status === "rejected").length,
             });
         }
 
         if (lockerCacheStatus === "FAILED") {
             logger.error("Locker hard refresh finished with queue enqueue failures", {
+                actorId: req.user?.userId,
+                correlationId: req.correlationId,
                 failedCount: lockerResults.filter((result) => result.status === "rejected").length,
             });
         }
 
         logger.info("Catalog hard refresh executed from RDS source of truth through cache projection queue", {
             actorId: req.user?.userId,
+            correlationId: req.correlationId,
             stationProjectionCount: stationProjections.length,
             cachedStationCount: cachedStations.length,
             lockerProjectionCount: lockerProjections.length,
             cachedLockerCount: cachedLockers.length,
             stationDeleteCount: stationDeleteCandidates.length,
             lockerDeleteCount: lockerDeleteCandidates.length,
+            stationCacheStatus,
+            lockerCacheStatus,
         });
 
         return sendSuccess(res, {
@@ -327,6 +339,13 @@ export class CacheSyncService {
 
     async hardRefreshStation(req: Request, res: Response) {
         const stationId = req.params.id as string;
+
+        logger.info("Station hard refresh requested", {
+            actorId: req.user?.userId,
+            correlationId: req.correlationId,
+            stationId,
+        });
+
         const [stationProjection, lockerProjections, cachedLockers] = await Promise.all([
             lockerCatalogProjectionService.getStationCacheProjection(stationId),
             lockerCatalogProjectionService.getLockerCacheProjectionsByStationId(stationId),
@@ -351,6 +370,38 @@ export class CacheSyncService {
             ),
         ]);
 
+        const stationCacheStatus = this.resolveCacheStatus(stationResults);
+        const lockerCacheStatus = this.resolveCacheStatus(lockerResults);
+
+        if (stationCacheStatus === "FAILED") {
+            logger.error("Station hard refresh finished with Redis write failures", {
+                actorId: req.user?.userId,
+                correlationId: req.correlationId,
+                stationId,
+                failedCount: stationResults.filter((result) => result.status === "rejected").length,
+            });
+        }
+
+        if (lockerCacheStatus === "FAILED") {
+            logger.error("Station locker hard refresh finished with queue enqueue failures", {
+                actorId: req.user?.userId,
+                correlationId: req.correlationId,
+                stationId,
+                failedCount: lockerResults.filter((result) => result.status === "rejected").length,
+            });
+        }
+
+        logger.info("Station hard refresh executed from RDS source of truth through cache projection queue", {
+            actorId: req.user?.userId,
+            correlationId: req.correlationId,
+            stationId,
+            lockerProjectionCount: lockerProjections.length,
+            cachedLockerCount: cachedLockers.length,
+            lockerDeleteCount: staleLockerDeletes.length,
+            stationCacheStatus,
+            lockerCacheStatus,
+        });
+
         return sendSuccess(res, {
             stationId,
             lockers: {
@@ -358,8 +409,8 @@ export class CacheSyncService {
                 deleteQueuedCount: staleLockerDeletes.length,
             },
         }, 202, {
-            stationCacheStatus: this.resolveCacheStatus(stationResults),
-            lockerCacheStatus: this.resolveCacheStatus(lockerResults),
+            stationCacheStatus,
+            lockerCacheStatus,
         });
     }
 }

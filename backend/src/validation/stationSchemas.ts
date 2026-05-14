@@ -23,7 +23,6 @@ export const getStationsWithParamsSchema = z.object({
         lat:z.string().optional(),
         lng:z.string().optional(),
         radius: z.string().optional(),
-        status: StationStatusEnum.optional(),
         limit: z.coerce.number().int().positive().max(200).optional(),
         skip: z.coerce.number().int().nonnegative().optional(),
     }).refine(

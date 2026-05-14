@@ -8,3 +8,36 @@ export const userDeviceOpenCloseSchema = z.object({
         clientRequestId: z.string().optional(),
     }),
 });
+
+export const operDeviceOpenCloseSchema = z.object({
+    body: z.discriminatedUnion("mode", [
+        z.object({
+            mode: z.literal("ALL"),
+            stationId: z.string().uuid(),
+            reason: z.string().min(1),
+            clientRequestId: z.string().min(1).optional(),
+        }),
+
+        z.object({
+            mode: z.literal("STATUS"),
+            stationId: z.string().uuid(),
+            status: z.enum([
+                "AVAILABLE",
+                "RESERVED",
+                "OCCUPIED",
+                "FAULTY",
+                "EXPIRED",
+            ]),
+            reason: z.string().min(1),
+            clientRequestId: z.string().min(1).optional(),
+        }),
+
+        z.object({
+            mode: z.literal("IDS"),
+            lockerBoxIds: z.array(z.string().uuid()).min(1),
+            stationId: z.string().uuid(),
+            reason: z.string().min(1),
+            clientRequestId: z.string().min(1).optional(),
+        }),
+    ]),
+});

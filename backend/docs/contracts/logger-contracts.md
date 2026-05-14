@@ -123,8 +123,8 @@ Backend emits structured `SECURITY_ALERT` JSON logs to stdout. CloudWatch is the
 
 Admin endpoints:
 
-- `GET /api/v1/admin/security-alerts`
-- `GET /api/v1/admin/security-alerts/cloudwatch` legacy alias
+- `GET /api/v1/admin/security-alerts/cloudwatch`
+- `GET /api/v1/operator/security-alerts/cloudwatch`
 
 Supported filters:
 

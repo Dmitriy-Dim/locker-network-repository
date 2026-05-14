@@ -132,7 +132,6 @@ export class LockerStationServiceImplPostgres {
     async getStations(req: Request, res: Response) {
         const cityId = req.query.cityId as string | undefined;
         const city = req.query.city as string | undefined;
-        const status = req.query.status as StationQuery["status"] | undefined;
         const lat = req.query.lat ? Number(req.query.lat) : undefined;
         const lng = req.query.lng ? Number(req.query.lng) : undefined;
         const radius = req.query.radius ? Number(req.query.radius) : undefined;
@@ -142,9 +141,9 @@ export class LockerStationServiceImplPostgres {
         const stations = await loadStationsWithFallback();
 
         const result = stations
+            .filter((station) => station.status === "ACTIVE")
             .filter((station) => !cityId || station.cityId === cityId)
             .filter((station) => !city || station.city.code === city)
-            .filter((station) => !status || station.status === status)
             .map((station) => {
                 const distance = lat !== undefined && lng !== undefined
                     ? resolveStationDistance({ lat, lng }, station)
@@ -181,6 +180,10 @@ export class LockerStationServiceImplPostgres {
         const station = await loadOneStationWithFallback(stationId);
 
         if (!station) {
+            throw new HttpError(404, "Station doesn't exist");
+        }
+
+        if (station.status !== "ACTIVE") {
             throw new HttpError(404, "Station doesn't exist");
         }
 

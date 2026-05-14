@@ -16,6 +16,7 @@ import {
     sendCloseLockerUserCommand, sendOpenLockerOperatorCommand, sendOpenLockerUserCommand
 } from "./sqsService";
 import {getBooking} from "./dynamoService";
+import {loadLockers, toLockerResponse} from "./lockerBox/lockerBoxService.helpers";
 
 
 
@@ -85,21 +86,14 @@ async function findLockersByStation(stationId: string){
 }
 
 async function findLockersByStatus(stationId: string, status: LockerStatus){
-    const result = await prismaService.$transaction(async (tx) => {
-        const station = await tx.lockerStation.findUnique({where: {stationId}});
+    const lockers = await loadLockers();
 
-        if (!station) throw new HttpError(404, "Station not found");
+    const result = lockers
+        .filter((locker) => locker.stationId === stationId)
+        .filter((locker) => locker.status === status)
+        .map((locker) => locker.lockerBoxId);
 
-        const lockers = await tx.lockerBox.findMany({
-            where: { stationId, status},
-            select: { lockerBoxId: true },
-        });
-
-        return lockers.map((locker) => locker.lockerBoxId);
-    });
     return result;
-
-
 
 }
 
@@ -316,7 +310,7 @@ export class DeviceService {
 
                 const {mode, stationId, lockerBoxIds, status, clientRequestId, reason} = req.body as {mode: string, stationId: string, lockerBoxIds: string[] | undefined, status: string | undefined, clientRequestId:string, reason:string};
                 const lockers = await findLockers({stationId, mode, status ,lockerBoxIds});
-                if (!lockers) {
+                if (lockers.length === 0) {
                     throw new HttpError(409, "No lockers match operator open filter");
                 }
 
@@ -458,7 +452,7 @@ export class DeviceService {
                         statusCode: 202,
                         body: toQueuedDeviceOperationResponse(
                             operationId,
-                            OperationType.LOCKER_OPEN_BATCH,
+                            OperationType.LOCKER_CLOSE_BATCH,
                             undefined,
                             "Batch locker close operation created"
                         ),

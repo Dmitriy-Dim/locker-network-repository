@@ -3,11 +3,21 @@ import { BookingStatus } from "@prisma/client";
 
 import { LockerSizeEnum } from "./lockersSchema";
 
+const MIN_BOOKING_DURATION_MS = 5 * 60 * 1000;
+const futureMinBookingEndTime = z.string().datetime().refine((value) => {
+    const endTime = new Date(value);
+
+    return !Number.isNaN(endTime.getTime())
+        && endTime.getTime() >= Date.now() + MIN_BOOKING_DURATION_MS;
+}, {
+    message: "expectedEndTime must be at least 5 minutes in the future",
+});
+
 export const bookingInitSchema = z.object({
     body: z.object({
         stationId: z.string().uuid(),
         size: LockerSizeEnum,
-        expectedEndTime: z.string().datetime(),
+        expectedEndTime: futureMinBookingEndTime,
     }),
 });
 

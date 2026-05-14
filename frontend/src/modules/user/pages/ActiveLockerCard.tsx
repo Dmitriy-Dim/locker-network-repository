@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Paper, Box, Typography, Stack, Chip, Button, Alert, CircularProgress,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField, Skeleton
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -30,8 +30,6 @@ function ReservedLockerCard({ booking }: { booking: any }) {
     const [isHidden, setIsHidden] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
     const [isRepaying, setIsRepaying] = useState(false);
-
-
     const expiresAt = booking.expiresAt
         ? new Date(booking.expiresAt).getTime()
         : null;
@@ -39,14 +37,14 @@ function ReservedLockerCard({ booking }: { booking: any }) {
     const [timeLeft, setTimeLeft] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
 
-    const { data: stationData, isLoading: isStationLoading } = useQuery({
+    const { data: stationData } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
         staleTime: STALE_TIME_EXTENDED,
     });
 
-    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
+    const { data: lockerData } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
@@ -72,26 +70,21 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         return () => clearInterval(t);
     }, [expiresAt]);
 
-    const isLoading = isStationLoading || isLockerLoading;
-
     const address = booking.station?.address
         || stationData?.address
-        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
-
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
     const lockerCode = booking.code
         || booking.lockerBox?.code
         || lockerData?.code
-        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
-
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
-
+        || lockerBoxId?.slice(-4).toUpperCase()
+        || '???';
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
 
     const handleRepay = async () => {
         if (!bookingId) return;
         setIsRepaying(true);
         try {
             const paymentUrl = getPaymentUrl(bookingId);
-
             if (paymentUrl) {
                 window.location.href = paymentUrl;
             } else {
@@ -110,8 +103,30 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         if (!bookingId) return;
         setIsCancelling(true);
         try {
-            await apiClient.post(`/bookings/${bookingId}/cancel`);
+            const response = await apiClient.post(`/bookings/${bookingId}/cancel`);
+            const data = response.data?.data;
             removePaymentUrl(bookingId);
+
+            if (response.status === 202 && data?.operationId) {
+                let attempts = 0;
+                const maxAttempts = 15;
+                await new Promise<void>((resolve) => {
+                    const interval = setInterval(async () => {
+                        attempts++;
+                        try {
+                            const opRes = await apiClient.get(`/operations/${data.operationId}`);
+                            const op = opRes.data?.data;
+                            if (op?.status === 'SUCCESS' || op?.status === 'FAILED' || attempts >= maxAttempts) {
+                                clearInterval(interval);
+                                resolve();
+                            }
+                        } catch {
+                            if (attempts >= maxAttempts) { clearInterval(interval); resolve(); }
+                        }
+                    }, 1500);
+                });
+            }
+
             queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
             setIsHidden(true);
         } catch (e: any) {
@@ -132,35 +147,24 @@ function ReservedLockerCard({ booking }: { booking: any }) {
             mb: 2,
             boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
             bgcolor: '#fffbf0',
-            minHeight: '180px'
         }}>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="h3" fontWeight={900}>
-                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
-                    </Typography>
+                <Box>
+                    <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
                     <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        <Typography color="text.secondary" fontWeight={600}>
-                            {address || <Skeleton width={250} />}
-                        </Typography>
+                        <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
                     </Stack>
                     <Stack direction="row" spacing={1}>
                         <Chip
                             label="RESERVED"
                             sx={{ fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
                         />
-                        {size ? (
-                            <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
-                        ) : (
-                            <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
-                        )}
+                        <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
                     </Stack>
                 </Box>
 
                 <Stack alignItems={{ xs: 'stretch', md: 'flex-end' }} spacing={2} sx={{ minWidth: { md: '320px' } }}>
-
-
                     {timeLeft && (
                         <Box sx={{
                             p: 2,
@@ -196,23 +200,15 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                         {!isExpired && (
                             <Button
                                 variant="contained"
-                                startIcon={isRepaying
-                                    ? <CircularProgress size={16} color="inherit" />
-                                    : <PaymentIcon />
-                                }
+                                startIcon={isRepaying ? <CircularProgress size={16} color="inherit" /> : <PaymentIcon />}
                                 onClick={handleRepay}
                                 disabled={isRepaying || isCancelling}
                                 sx={{
-                                    flex: 1,
-                                    bgcolor: '#f59e0b',
-                                    color: '#fff',
-                                    borderRadius: 2,
-                                    fontWeight: 800,
-                                    textTransform: 'none',
-                                    '&:hover': { bgcolor: '#d97706' },
+                                    flex: 1, bgcolor: '#f59e0b', color: '#fff', borderRadius: 2,
+                                    fontWeight: 800, textTransform: 'none', '&:hover': { bgcolor: '#d97706' },
                                 }}
                             >
-                                {isRepaying ? 'Loading...' : 'Repay'}
+                                {isRepaying ? 'Loading...' : 'Pay Now'}
                             </Button>
                         )}
                         <Button
@@ -221,12 +217,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
                             onClick={handleCancel}
                             disabled={isCancelling || isRepaying}
                             startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
-                            sx={{
-                                flex: isExpired ? 1 : undefined,
-                                borderRadius: 2,
-                                fontWeight: 700,
-                                textTransform: 'none',
-                            }}
+                            sx={{ flex: isExpired ? 1 : undefined, borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
                         >
                             {isCancelling ? 'Cancelling...' : 'Cancel'}
                         </Button>
@@ -242,14 +233,8 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const navigate = useNavigate();
 
     const {
-        openLocker,
-        closeLocker,
-        cancelBookingDevice,
-        extendBooking,
-        isWorking,
-        isLockerOpen,
-        isCancelling,
-        operationError,
+        openLocker, closeLocker, cancelBookingDevice, extendBooking,
+        isWorking, isLockerOpen, isCancelling, operationError,
     } = useDeviceOperation();
 
     const bookingId = booking.bookingId || booking.id;
@@ -262,14 +247,10 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         try {
             const canceledList = JSON.parse(localStorage.getItem('canceled_bookings') || '[]');
             return canceledList.includes(bookingId);
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     });
 
-    const [timeLeft, setTimeLeft] = useState(() =>
-        booking.expectedEndTime ? "Calculating..." : "No end time"
-    );
+    const [timeLeft, setTimeLeft] = useState(() => booking.expectedEndTime ? "Calculating..." : "No end time");
     const [timerStatus, setTimerStatus] = useState<"active" | "expired" | "heavilyOverdue" | "noTime">(() =>
         booking.expectedEndTime ? "active" : "noTime"
     );
@@ -278,14 +259,14 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const [extendDate, setExtendDate] = useState("");
     const [extendTime, setExtendTime] = useState("");
 
-    const { data: stationData, isLoading: isStationLoading } = useQuery({
+    const { data: stationData } = useQuery({
         queryKey: ['station-details', stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId && !booking.station?.address,
         staleTime: STALE_TIME_EXTENDED,
     });
 
-    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
+    const { data: lockerData } = useQuery({
         queryKey: ['locker-details', lockerBoxId],
         queryFn: () => lockersApi.getLockerById(lockerBoxId!),
         enabled: !!lockerBoxId && !booking.size,
@@ -321,19 +302,12 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
 
     if (isHidden) return null;
 
-    const isLoading = isStationLoading || isLockerLoading;
-
     const address = booking.station?.address
         || stationData?.address
-        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
-
-    const lockerCode = booking.code
-        || booking.lockerBox?.code
-        || lockerData?.code
-        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
-
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
-
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+    const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
+        || lockerBoxId?.slice(-4).toUpperCase() || '???';
+    const size = booking.size || booking.lockerBox?.size || lockerData?.size || 'N/A';
     const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
     const handleOpenExtendModal = () => {
@@ -400,27 +374,17 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     return (
         <>
             <Paper sx={{
-                p: 4,
-                borderRadius: 4,
-                borderLeft: timerStatus === 'heavilyOverdue'
-                    ? '10px solid #dc2626'
-                    : timerStatus === 'expired'
-                        ? '10px solid #f59e0b'
-                        : '10px solid #2e7d32',
-                mb: 2,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                minHeight: '220px'
+                p: 4, borderRadius: 4,
+                borderLeft: timerStatus === 'heavilyOverdue' ? '10px solid #dc2626'
+                    : timerStatus === 'expired' ? '10px solid #f59e0b' : '10px solid #2e7d32',
+                mb: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
             }}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
-                    <Box sx={{ flex: 1 }}>
-                        <Typography variant="h3" fontWeight={900}>
-                            {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
-                        </Typography>
+                    <Box>
+                        <Typography variant="h3" fontWeight={900}>Locker #{lockerCode}</Typography>
                         <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
                             <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                            <Typography color="text.secondary" fontWeight={600}>
-                                {address || <Skeleton width={250} />}
-                            </Typography>
+                            <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
                         </Stack>
                         <Stack direction="row" spacing={1}>
                             <Chip
@@ -428,11 +392,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                 color={timerStatus === 'heavilyOverdue' ? "error" : isActive ? "success" : "warning"}
                                 sx={{ fontWeight: 700 }}
                             />
-                            {size ? (
-                                <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
-                            ) : (
-                                <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
-                            )}
+                            <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
                         </Stack>
                     </Box>
 
@@ -440,19 +400,12 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                         {isStuck ? (
                             <Box sx={{ p: 2.5, bgcolor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 2, textAlign: 'center', width: '100%' }}>
                                 <Typography variant="h4" mb={1}>😕</Typography>
-                                <Typography variant="subtitle1" color="#991b1b" fontWeight={800} mb={0.5}>
-                                    Oops, something went wrong!
-                                </Typography>
+                                <Typography variant="subtitle1" color="#991b1b" fontWeight={800} mb={0.5}>Oops, something went wrong!</Typography>
                                 <Typography variant="caption" color="#b91c1c" sx={{ display: 'block', mb: 2, lineHeight: 1.4 }}>
                                     We couldn't open this locker. Don't worry, we will find a more suitable locker for you.
                                 </Typography>
-                                <Button
-                                    variant="contained"
-                                    color="error"
-                                    fullWidth
-                                    onClick={() => navigate(`/stations/${stationId}`)}
-                                    sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}
-                                >
+                                <Button variant="contained" color="error" fullWidth onClick={() => navigate(`/stations/${stationId}`)}
+                                        sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}>
                                     Book a new locker
                                 </Button>
                             </Box>
@@ -463,7 +416,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                         {operationError.errorMessage ?? "Operation failed. Please try again."}
                                     </Alert>
                                 )}
-
                                 {timerStatus === 'heavilyOverdue' && (
                                     <Alert severity="error" sx={{ borderRadius: 2 }}>
                                         <Typography variant="subtitle2" fontWeight={800} mb={0.5}>Items moved to Lost & Found</Typography>
@@ -472,69 +424,46 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                         </Typography>
                                     </Alert>
                                 )}
-
                                 {timerStatus === 'expired' && (
                                     <>
                                         <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', width: '100%' }}>
                                             <Typography variant="caption" color="text.secondary" fontWeight={700}>Expired</Typography>
                                             <Typography variant="h5" fontWeight={800} color="#b45309">Overdue</Typography>
                                         </Box>
-                                        <Button
-                                            variant="contained"
-                                            color="warning"
-                                            fullWidth
-                                            onClick={() => alert("Redirecting to Pay Overdue Amount")}
-                                            sx={{ borderRadius: 2, fontWeight: 800 }}
-                                        >
+                                        <Button variant="contained" color="warning" fullWidth
+                                                onClick={() => alert("Redirecting to Pay Overdue Amount")}
+                                                sx={{ borderRadius: 2, fontWeight: 800 }}>
                                             Pay Overdue Amount
                                         </Button>
                                     </>
                                 )}
-
                                 {timerStatus === 'active' && isActive && (
                                     <>
                                         <Box sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: 2, textAlign: 'center', width: '100%' }}>
                                             <Typography variant="caption" color="text.secondary" fontWeight={700}>Ends in:</Typography>
                                             <Typography variant="h5" fontWeight={800} color="#166534">{timeLeft}</Typography>
                                         </Box>
-
                                         <Button
                                             variant="contained"
                                             color={isLockerOpen ? "warning" : "success"}
                                             onClick={toggleLockerDevice}
                                             disabled={isWorking}
-                                            startIcon={isWorking
-                                                ? <CircularProgress size={20} color="inherit" />
-                                                : (isLockerOpen ? <LockIcon /> : <LockOpenIcon />)
-                                            }
+                                            startIcon={isWorking ? <CircularProgress size={20} color="inherit" /> : (isLockerOpen ? <LockIcon /> : <LockOpenIcon />)}
                                             sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none', py: 1.5, fontSize: '1.1rem', width: '100%' }}
                                         >
                                             {isWorking ? "Connecting..." : (isLockerOpen ? "Close Locker" : "Open Locker")}
                                         </Button>
-
                                         <Stack direction="row" spacing={1} sx={{ width: '100%', pointerEvents: 'none' }}>
-                                            <Button
-                                                variant="contained"
-                                                onClick={handleOpenExtendModal}
-                                                disabled={isWorking}
-                                                startIcon={<AccessTimeIcon />}
-                                                sx={{
-                                                    borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1,
-                                                    bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' },
-                                                    pointerEvents: 'auto'
-                                                }}
-                                            >
+                                            <Button variant="contained" onClick={handleOpenExtendModal} disabled={isWorking}
+                                                    startIcon={<AccessTimeIcon />}
+                                                    sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1, bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' }, pointerEvents: 'auto' }}>
                                                 Extend
                                             </Button>
-                                            <Button
-                                                variant="outlined"
-                                                color="error"
-                                                onClick={handleCancel}
-                                                disabled={isCancelling || isWorking}
-                                                startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
-                                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1, pointerEvents: 'auto' }}
-                                            >
-                                                {isCancelling ? "Cancelling..." : "Cancel"}
+                                            <Button variant="outlined" color="error" onClick={handleCancel}
+                                                    disabled={isCancelling || isWorking}
+                                                    startIcon={isCancelling ? <CircularProgress size={16} color="inherit" /> : null}
+                                                    sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', flex: 1, pointerEvents: 'auto' }}>
+                                                {isCancelling ? "Ending..." : (booking.bookingStatus === 'ACTIVE' ? "End" : "Cancel")}
                                             </Button>
                                         </Stack>
                                     </>
@@ -545,11 +474,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                 </Stack>
             </Paper>
 
-            <Dialog
-                open={isExtendModalOpen}
-                onClose={() => setIsExtendModalOpen(false)}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
+            <Dialog open={isExtendModalOpen} onClose={() => setIsExtendModalOpen(false)} PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
                 <DialogTitle sx={{ fontWeight: 800 }}>Extend Booking Time</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" mb={3}>
@@ -557,39 +482,21 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                     </Typography>
                     <Grid container spacing={2}>
                         <Grid size={{ xs: 12, sm: 6 }}>
-                            <TextField
-                                type="date"
-                                label="New End Date"
-                                value={extendDate}
-                                onChange={(e) => setExtendDate(e.target.value)}
-                                fullWidth
-                                InputLabelProps={{ shrink: true }}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                            />
+                            <TextField type="date" label="New End Date" value={extendDate}
+                                       onChange={(e) => setExtendDate(e.target.value)} fullWidth
+                                       InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
-                            <TextField
-                                type="time"
-                                label="New End Time"
-                                value={extendTime}
-                                onChange={(e) => setExtendTime(e.target.value)}
-                                fullWidth
-                                InputLabelProps={{ shrink: true }}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                            />
+                            <TextField type="time" label="New End Time" value={extendTime}
+                                       onChange={(e) => setExtendTime(e.target.value)} fullWidth
+                                       InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
                         </Grid>
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setIsExtendModalOpen(false)} sx={{ color: '#64748b', fontWeight: 700 }}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleConfirmExtend}
-                        variant="contained"
-                        disabled={isWorking}
-                        sx={{ bgcolor: '#3b82f6', borderRadius: 2, fontWeight: 700 }}
-                    >
+                    <Button onClick={() => setIsExtendModalOpen(false)} sx={{ color: '#64748b', fontWeight: 700 }}>Cancel</Button>
+                    <Button onClick={handleConfirmExtend} variant="contained" disabled={isWorking}
+                            sx={{ bgcolor: '#3b82f6', borderRadius: 2, fontWeight: 700 }}>
                         {isWorking ? "Extending..." : "Confirm & Pay"}
                     </Button>
                 </DialogActions>
@@ -602,43 +509,21 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
     const stationId = booking.stationId;
     const lockerBoxId = booking.lockerBoxId;
 
-    const { data: stationData, isLoading: isStationLoading } = useQuery({
-        queryKey: ['station-details', stationId],
-        queryFn: () => stationsApi.getStationById(stationId!),
-        enabled: !!stationId && !booking.station?.address,
-        staleTime: STALE_TIME_EXTENDED,
-    });
-
-    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
-        queryKey: ['locker-details', lockerBoxId],
-        queryFn: () => lockersApi.getLockerById(lockerBoxId!),
-        enabled: !!lockerBoxId && !booking.size,
-        staleTime: STALE_TIME_EXTENDED,
-    });
-
-    const isLoading = isStationLoading || isLockerLoading;
-
-    const address = booking.station?.address || stationData?.address
-        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
-    const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
-        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
+    const address = booking.station?.address
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+    const lockerCode = booking.code || booking.lockerBox?.code
+        || lockerBoxId?.slice(-4).toUpperCase() || '???';
+    const size = booking.size || booking.lockerBox?.size || 'N/A';
 
     const statusLabel: Record<string, string> = {
-        CANCELLED: 'Cancelled',
-        COMPLETED: 'Completed',
-        ENDED: 'Ended',
-        EXPIRED: 'Expired',
-        PAYMENT_CONFIRMED: 'Payment confirmed',
+        CANCELLED: 'Cancelled', COMPLETED: 'Completed', ENDED: 'Ended',
+        EXPIRED: 'Expired', PAYMENT_CONFIRMED: 'Payment confirmed',
     };
     const label = statusLabel[booking.bookingStatus] ?? booking.bookingStatus ?? 'Unknown';
 
     const statusColor: Record<string, string> = {
-        CANCELLED: '#dc2626',
-        COMPLETED: '#16a34a',
-        ENDED: '#16a34a',
-        EXPIRED: '#b45309',
-        PAYMENT_CONFIRMED: '#2563eb',
+        CANCELLED: '#dc2626', COMPLETED: '#16a34a', ENDED: '#16a34a',
+        EXPIRED: '#b45309', PAYMENT_CONFIRMED: '#2563eb',
     };
     const borderColor = statusColor[booking.bookingStatus] ?? '#94a3b8';
 
@@ -647,40 +532,21 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
         : null;
 
     return (
-        <Paper sx={{
-            p: 3,
-            borderRadius: 4,
-            borderLeft: `6px solid ${borderColor}`,
-            mb: 2,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            opacity: 0.85,
-            minHeight: '80px'
-        }}>
+        <Paper sx={{ p: 3, borderRadius: 4, borderLeft: `6px solid ${borderColor}`, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', opacity: 0.85 }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="h5" fontWeight={800} color="#1e293b">
-                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={120} />}
-                    </Typography>
+                <Box>
+                    <Typography variant="h5" fontWeight={800} color="#1e293b">Locker #{lockerCode}</Typography>
                     <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                            {address || <Skeleton width={200} />}
-                        </Typography>
+                        <Typography variant="body2" color="text.secondary" fontWeight={600}>{address}</Typography>
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Chip label={label.toUpperCase()} size="small"
-                          sx={{ fontWeight: 700, bgcolor: `${borderColor}18`, color: borderColor, border: `1px solid ${borderColor}40` }}
-                    />
-                    {size ? (
-                        <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                    ) : (
-                        <Skeleton variant="rounded" width={60} height={24} sx={{ borderRadius: 4 }} />
-                    )}
+                          sx={{ fontWeight: 700, bgcolor: `${borderColor}18`, color: borderColor, border: `1px solid ${borderColor}40` }} />
+                    <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
                     {endDateStr && (
-                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                            until {endDateStr}
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>until {endDateStr}</Typography>
                     )}
                 </Stack>
             </Stack>
@@ -690,30 +556,13 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
 export function ActionRequiredLockerCard({ booking }: { booking: any }) {
     const stationId = booking.stationId;
     const lockerBoxId = booking.lockerBoxId;
-
     const [now] = useState(() => Date.now());
 
-    const { data: stationData, isLoading: isStationLoading } = useQuery({
-        queryKey: ['station-details', stationId],
-        queryFn: () => stationsApi.getStationById(stationId!),
-        enabled: !!stationId && !booking.station?.address,
-        staleTime: STALE_TIME_EXTENDED,
-    });
-
-    const { data: lockerData, isLoading: isLockerLoading } = useQuery({
-        queryKey: ['locker-details', lockerBoxId],
-        queryFn: () => lockersApi.getLockerById(lockerBoxId!),
-        enabled: !!lockerBoxId && !booking.size,
-        staleTime: STALE_TIME_EXTENDED,
-    });
-
-    const isLoading = isStationLoading || isLockerLoading;
-
-    const address = booking.station?.address || stationData?.address
-        || (isLoading ? null : `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`);
-    const lockerCode = booking.code || booking.lockerBox?.code || lockerData?.code
-        || (isLoading ? null : (lockerBoxId?.slice(-4).toUpperCase() || '???'));
-    const size = booking.size || booking.lockerBox?.size || lockerData?.size || (isLoading ? null : 'N/A');
+    const address = booking.station?.address
+        || `Station ID: ${stationId?.slice(-6).toUpperCase() ?? 'N/A'}`;
+    const lockerCode = booking.code || booking.lockerBox?.code
+        || lockerBoxId?.slice(-4).toUpperCase() || '???';
+    const size = booking.size || booking.lockerBox?.size || 'N/A';
 
     const endTime = booking.expectedEndTime ? new Date(booking.expectedEndTime).getTime() : null;
     const isHeavilyOverdue = endTime !== null && (now - endTime) > 8 * 60 * 60 * 1000;
@@ -723,28 +572,18 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
         : null;
 
     return (
-        <Paper sx={{
-            p: 4,
-            borderRadius: 4,
-            borderLeft: isHeavilyOverdue ? '10px solid #dc2626' : '10px solid #f59e0b',
-            mb: 2,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-        }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'stretch' }} spacing={3}>
-
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <Typography variant="h3" fontWeight={900}>
-                        {lockerCode ? `Locker #${lockerCode}` : <Skeleton width={180} />}
-                    </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center" mt={1} mb={2}>
+        <Paper sx={{ p: 4, borderRadius: 4, borderLeft: isHeavilyOverdue ? '10px solid #dc2626' : '10px solid #f59e0b', mb: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={3}>
+                <Box sx={{ flex: 1 }}>
+                    <Typography variant="h4" fontWeight={900}>Locker #{lockerCode}</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={0.5} mb={1.5}>
                         <LocationOnIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        <Typography color="text.secondary" fontWeight={600}>
-                            {address || <Skeleton width={250} />}
-                        </Typography>
+                        <Typography color="text.secondary" fontWeight={600}>{address}</Typography>
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center">
                         <Chip
                             label={isHeavilyOverdue ? 'ITEMS MOVED' : (booking.bookingStatus || 'EXPIRED')}
+                            size="small"
                             sx={{
                                 fontWeight: 700,
                                 bgcolor: isHeavilyOverdue ? '#fee2e2' : '#fef3c7',
@@ -752,49 +591,30 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                                 border: `1px solid ${isHeavilyOverdue ? '#fecaca' : '#fde68a'}`,
                             }}
                         />
-                        {size
-                            ? <Chip label={`Size ${size}`} variant="outlined" sx={{ fontWeight: 700 }} />
-                            : <Skeleton variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
-                        }
+                        <Chip label={`Size ${size}`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                        {endDateStr && (
+                            <Typography variant="caption" color="text.secondary">until {endDateStr}</Typography>
+                        )}
                     </Stack>
                 </Box>
 
-                <Stack
-                    alignItems={{ xs: 'stretch', md: 'flex-end' }}
-                    justifyContent="center"
-                    spacing={1.5}
-                    sx={{ minWidth: { md: '300px' } }}
-                >
-                    {endDateStr && (
-                        <Typography variant="caption" color="text.secondary" fontWeight={600} textAlign={{ md: 'right' }}>
-                            Booked until {endDateStr}
-                        </Typography>
-                    )}
-
+                <Stack spacing={1.5} sx={{ minWidth: { md: '280px' } }}>
                     {isHeavilyOverdue ? (
                         <Alert severity="error" sx={{ borderRadius: 2 }}>
-                            <Typography variant="subtitle2" fontWeight={800} mb={0.5}>
-                                Items moved to Lost & Found
-                            </Typography>
+                            <Typography variant="subtitle2" fontWeight={800} mb={0.5}>Items moved to Lost & Found</Typography>
                             <Typography variant="caption" sx={{ display: 'block', lineHeight: 1.4 }}>
                                 Your booking is more than 8 hours overdue. Please contact support.
                             </Typography>
                         </Alert>
                     ) : (
                         <>
-                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a', width: '100%' }}>
+                            <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a' }}>
                                 <Typography variant="caption" color="#92400e" fontWeight={700}>Overdue</Typography>
-                                <Typography variant="body2" color="#b45309" fontWeight={800}>
-                                    Payment required
-                                </Typography>
+                                <Typography variant="body2" color="#b45309" fontWeight={800}>Payment required</Typography>
                             </Box>
-                            <Button
-                                variant="contained"
-                                color="warning"
-                                fullWidth
-                                onClick={() => alert("Redirecting to Pay Overdue Amount")}
-                                sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}
-                            >
+                            <Button variant="contained" color="warning" fullWidth
+                                    onClick={() => alert("Redirecting to Pay Overdue Amount")}
+                                    sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}>
                                 Pay Overdue Amount
                             </Button>
                         </>

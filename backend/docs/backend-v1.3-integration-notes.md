@@ -93,10 +93,10 @@ Response:
 
 ### CloudWatch Security Alerts
 
-Backend now exposes admin security alert reads from CloudWatch Logs Insights. Alerts are not duplicated into RDS.
+Backend exposes admin/operator security alert reads from CloudWatch Logs Insights. Alerts are not duplicated into RDS.
 
-- `GET /api/v1/admin/security-alerts`
-- `GET /api/v1/admin/security-alerts/cloudwatch` legacy alias
+- `GET /api/v1/admin/security-alerts/cloudwatch`
+- `GET /api/v1/operator/security-alerts/cloudwatch`
 
 Query params:
 

@@ -112,6 +112,19 @@ export type CloseLockerUserCommand = {
     };
 };
 
+export type BookingEndCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_END;
+    payload: {
+        userId: string;
+        stationId: string;
+        lockerBoxId: string;
+        bookingId: string;
+        clientRequestId: string;
+        requestedAt: string;
+    };
+};
+
 export type OpenLockerOperatorCommand = {
     operationId: string;
     type: OperationType.LOCKER_OPEN_BATCH;
@@ -277,6 +290,10 @@ export async function sendBookingExtendToQueue(command: BookingExtendCommand) {
 }
 
 export async function sendBookingCancelToQueue(command: BookingCancelCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingEndToQueue(command: BookingEndCommand) {
     await sendCommandToQueue(command);
 }
 

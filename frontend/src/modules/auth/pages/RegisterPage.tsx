@@ -80,6 +80,14 @@ export function RegisterPage() {
                 >
                     ← Back to Home
                 </Button>
+                <Box display="flex" justifyContent="center" mb={3}>
+                    <img
+                        src="/logo_app.png"
+                        alt="logo"
+                        width={460}
+                        height={240}
+                    />
+                </Box>
                 <Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">
                     Create Account
                 </Typography>

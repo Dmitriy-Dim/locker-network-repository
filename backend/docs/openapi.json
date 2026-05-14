@@ -4273,87 +4273,6 @@
         }
       }
     },
-    "/api/v1/admin/security-alerts": {
-      "get": {
-        "tags": [
-          "Security Alerts",
-          "Admin"
-        ],
-        "summary": "Query CloudWatch security alerts",
-        "description": "Reads SECURITY_ALERT structured logs from CloudWatch Logs Insights. Alerts are not duplicated into RDS.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/LimitQuery"
-          },
-          {
-            "$ref": "#/components/parameters/FromQuery"
-          },
-          {
-            "$ref": "#/components/parameters/ToQuery"
-          },
-          {
-            "name": "severity",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "CRITICAL",
-                "HIGH",
-                "MEDIUM",
-                "LOW"
-              ]
-            }
-          },
-          {
-            "name": "eventType",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "source",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/UserIdQuery"
-          },
-          {
-            "name": "correlationId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "CloudWatch security alerts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          }
-        }
-      }
-    },
     "/api/v1/admin/security-alerts/cloudwatch": {
       "get": {
         "tags": [
@@ -4361,7 +4280,8 @@
           "Admin"
         ],
         "summary": "Query CloudWatch security alerts",
-        "description": "Backward-compatible alias for /api/v1/admin/security-alerts.",
+        "description": "Reads SECURITY_ALERT structured logs from CloudWatch Logs Insights. Alerts are not duplicated into RDS.",
+        "operationId": "queryCloudWatchSecurityAlerts",
         "security": [
           {
             "bearerAuth": []
@@ -4657,6 +4577,88 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/operator/security-alerts/cloudwatch": {
+      "get": {
+        "tags": [
+          "Security Alerts",
+          "Operator"
+        ],
+        "summary": "Query CloudWatch security alerts for operator",
+        "description": "Operator-accessible endpoint that reads SECURITY_ALERT structured logs from CloudWatch Logs Insights. Alerts are not duplicated into RDS.",
+        "operationId": "queryOperatorCloudWatchSecurityAlerts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/FromQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ToQuery"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/UserIdQuery"
+          },
+          {
+            "name": "correlationId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CloudWatch security alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

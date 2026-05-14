@@ -8,6 +8,7 @@ import {prismaService} from "./prismaService";
 import {ActionType} from "./dto/operationDto";
 import {logSecurityEvent, SecurityEventType} from "./securityEventService";
 import {idempotencyService} from "./IdempotencyService";
+import {sendSuccess} from "../utils/response";
 
 export class AdminActions {
 
@@ -170,12 +171,13 @@ export class AdminActions {
                 phone: true,
                 email: true,
                 role: true,
+                isDeleted: true,
             }
         })
         if (!user) {
             throw new HttpError(404, "User not found");
         }
-        return res.status(200).json(user);
+        return sendSuccess(res,user);
     }
 
     static async deleteUser(req: Request, res: Response) {
@@ -195,7 +197,7 @@ export class AdminActions {
                             throw new HttpError(404, "User not found");
                         }
                         if (user.isDeleted === true) {
-                            throw new HttpError(400, "User already deleted");
+                            throw new HttpError(409, "User already deleted");
                         }
                         const deletedUser = await tx.user.update({
                             where: {userId},
@@ -209,7 +211,17 @@ export class AdminActions {
                                 phone: true,
                                 email: true,
                                 role: true,
+                                isDeleted: true,
                             }
+                        });
+                        await tx.refreshSession.updateMany({
+                            where: {
+                                userId,
+                                revokedAt: null,
+                            },
+                            data: {
+                                revokedAt: new Date(),
+                            },
                         });
                         return deletedUser;
                     });
@@ -267,7 +279,7 @@ export class AdminActions {
                             throw new HttpError(404, "User not found");
                         }
                         if (user.isDeleted === false) {
-                            throw new HttpError(400, "User already active");
+                            throw new HttpError(409, "User already active");
                         }
                         const restoredUser = await tx.user.update({
                             where: {userId},
@@ -281,6 +293,7 @@ export class AdminActions {
                                 phone: true,
                                 email: true,
                                 role: true,
+                                isDeleted: true,
                             }
                         });
                         return restoredUser;
