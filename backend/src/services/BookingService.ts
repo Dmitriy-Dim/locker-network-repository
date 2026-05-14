@@ -1,25 +1,37 @@
-import { Request, Response } from "express";
-import { BookingStatus, LockerStatus, Prisma, Role, StationStatus, TechnicalStatus } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
+import {Request, Response} from "express";
+import {
+    BookingStatus,
+    LockerStatus,
+    Prisma,
+    Role,
+    StationStatus,
+    TechnicalStatus
+} from "@prisma/client";
+import {v4 as uuidv4} from "uuid";
 
-import { BookingInitRequestDto, BookingRecordDto } from "../contracts/booking.dto";
-import { HttpError } from "../errorHandler/HttpError";
-import { logger } from "../Logger/winston";
-import { operationRepository } from "../repositories/operation/OperationRepository";
-import { logAudit } from "../utils/audit";
-import { sendSuccess } from "../utils/response";
+import {
+    BookingInitRequestDto,
+    BookingRecordDto
+} from "../contracts/booking.dto";
+import {HttpError} from "../errorHandler/HttpError";
+import {logger} from "../Logger/winston";
+import {
+    operationRepository
+} from "../repositories/operation/OperationRepository";
+import {logAudit} from "../utils/audit";
+import {sendSuccess} from "../utils/response";
 
 import {ActionType, OperationStatus, OperationType} from "./dto/operationDto";
 import {
-    sendBookingCancelToQueue, sendBookingEndToQueue,
+    sendBookingCancelToQueue,
+    sendBookingEndToQueue,
     sendBookingExtendToQueue,
     sendBookingInitToQueue,
     sendBookingStatusUpdateToQueue,
 } from "./sqsService";
-import { getAllBookings, getAllUserBookings, getBooking, getLockerCache } from "./dynamoService";
+import {getAllBookings, getBooking, getLockerCache} from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
-import { prismaService } from "./prismaService";
-import {getPaymentByBookingId} from "../controllers/bookingController";
+import {prismaService} from "./prismaService";
 
 const MIN_BOOKING_DURATION_MS = 5 * 60 * 1000;
 
@@ -1052,13 +1064,15 @@ export class BookingService {
             throw new HttpError(401, "Unauthorized");
         }
 
-        const allBookings = await getAllUserBookings(userId) as BookingRecordDto[];
+        // const allBookings = await getAllUserBookings(userId) as BookingRecordDto[];
+        const allBookings = await getAllBookings() as BookingRecordDto[];
         const status = req.query.status as BookingStatus | undefined;
         const lockerBoxId = req.query.lockerBoxId as string | undefined;
         const stationId = req.query.stationId as string | undefined;
         const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
         const skip = Number(req.query.skip ?? 0);
         const ownBookings = allBookings
+            .filter((booking) => !userId || booking.userId === userId)
             .filter((booking) => !status || booking.status === status)
             .filter((booking) => !lockerBoxId || booking.lockerBoxId === lockerBoxId)
             .filter((booking) => !stationId || booking.stationId === stationId);
