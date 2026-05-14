@@ -10,7 +10,7 @@ interface ApiResponse<T> {
 
 export const getAdminSecurityAlerts = async (): Promise<SecurityAlert[]> => {
     const response = await apiClient.get<ApiResponse<SecurityAlert[]>>(
-        "/admin/security-alerts"
+        "/admin/security-alerts/cloudwatch"
     );
 
     return response.data.data;

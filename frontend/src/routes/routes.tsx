@@ -83,7 +83,7 @@ export function AppRoutes() {
                 <Route path="users" element={<AdminUsersTables />} />
                 <Route path="stations/:stationId" element={<StationDetailsPage />} />
                 <Route path="pricing" element={<PricingDashboard />} />
-                <Route path="alerts" element={<AdminAlertsPage />} />
+                <Route path="alerts/cloudwatch" element={<AdminAlertsPage />} />
             </Route>
 
             {/* ================= OPERATOR ================= */}

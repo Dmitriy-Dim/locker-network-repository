@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { useLockers } from "../../../hooks/useLockers";
 
-import type { LockerStation, LockerTechStatus } from "../../../types/index";
+import type { LockerStation, LockerTechStatus, LockerStatus } from "../../../types/index";
 import {
     Box,
     Typography,
@@ -26,9 +26,28 @@ const getChipColor = (status: string) => {
     }
 };
 
+const getBusinessStatusColor = (status: string) => {
+    switch (status) {
+        case "AVAILABLE":
+            return "success";
+
+        case "RESERVED":
+            return "warning";
+
+        case "OCCUPIED":
+            return "error";
+
+        case "EXPIRED":
+            return "secondary";
+
+        default:
+            return "default";
+    }
+};
+
 export default function OperatorStationDetailsPage() {
     const { stationId } = useParams();
-    const { changeLockerTechStatus } = useLockers();
+const { changeLockerTechStatus, changeLockerStatus } = useLockers();
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["operator-station", stationId],
@@ -42,6 +61,16 @@ export default function OperatorStationDetailsPage() {
         changeLockerTechStatus({
             lockerBoxId: lockerId,
             techStatus: newStatus
+        });
+    };
+
+    const handleBusinessStatusChange = (
+        lockerId: string,
+        newStatus: LockerStatus
+    ) => {
+        changeLockerStatus({
+            lockerBoxId: lockerId,
+            status: newStatus
         });
     };
 
@@ -81,6 +110,17 @@ export default function OperatorStationDetailsPage() {
                                 sx={{ mt: 1 }}
                             />
 
+                            <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                                Business Status
+                            </Typography>
+
+                            <Chip
+                                label={locker.status ?? 'NO_STATUS'}
+                                color={getBusinessStatusColor(locker.status ?? 'NO_STATUS')}
+                                size="small"
+                                sx={{ mt: 0.5 }}
+                            />
+
                             <FormControl fullWidth sx={{ mt: 2 }}>
                                 <Select
                                     size="small"
@@ -96,6 +136,24 @@ export default function OperatorStationDetailsPage() {
                                     <MenuItem value="ACTIVE">ACTIVE</MenuItem>
                                     <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
                                     <MenuItem value="FAULTY">FAULTY</MenuItem>
+                                </Select>
+                            </FormControl>
+
+                            <FormControl fullWidth sx={{ mt: 2 }}>
+                                <Select
+                                    size="small"
+                                    value={locker.status ?? ''}
+                                    onChange={(e) =>
+                                        handleBusinessStatusChange(
+                                            locker.lockerBoxId,
+                                            e.target.value as LockerStatus
+                                        )
+                                    }
+                                >
+                                    <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
+                                    <MenuItem value="RESERVED">RESERVED</MenuItem>
+                                    <MenuItem value="OCCUPIED">OCCUPIED</MenuItem>
+                                    <MenuItem value="EXPIRED">EXPIRED</MenuItem>
                                 </Select>
                             </FormControl>
                         </Paper>
