@@ -73,3 +73,12 @@ export const changeTechStatusLockerSchema = z.object({
         id: z.string().uuid(),
     })
 });
+
+export const changeStatusLockerSchema = z.object({
+    body: z.object({
+        status: LockerStatusEnum,
+    }),
+    params: z.object({
+        id: z.string().uuid(),
+    })
+});

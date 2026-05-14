@@ -12,6 +12,7 @@ import {
     oneStationSchema
 } from "../validation/stationSchemas";
 import {
+    changeStatusLockerSchema,
     changeTechStatusLockerSchema,
     createLockerSchema,
     getAdminLockersQuerySchema,
@@ -58,6 +59,7 @@ lockersRoutes.post('/admin/cache/hard-refresh', authorize(Role.ADMIN), lockerSta
 lockersRoutes.get('/oper/stations', authorize(Role.OPERATOR), validateRequest(getAdminStationsQuerySchema), lockerStationController.getAllStation);
 lockersRoutes.get('/oper/stations/:id', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
 lockersRoutes.patch('/oper/stations/:id/status', authorize(Role.OPERATOR), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
+lockersRoutes.patch('/oper/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
 lockersRoutes.patch('/oper/boxes/:id/tech-status', authorize(Role.OPERATOR), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.patch('/oper/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
 lockersRoutes.patch('/oper/stations/:id/delete', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.deleteStation);
