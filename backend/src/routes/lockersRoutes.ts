@@ -41,6 +41,7 @@ lockersRoutes.get('/stations/:id', authorize(Role.USER), validateRequest(oneStat
 // admin/operator routes backed by RDS
 lockersRoutes.get('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(getAdminLockersQuerySchema), lockerBoxController.getAllBoxes);
 lockersRoutes.get('/admin/boxes/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.getOneBoxAdmin);
+lockersRoutes.patch('/admin/boxes/:id/status', authorize(Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
 lockersRoutes.post('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createLockerSchema), lockerBoxController.createBox);
 lockersRoutes.post('/admin/boxes/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.resyncLockerCache);
 lockersRoutes.post('/admin/boxes/:id/hard-resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.hardResyncLockerCache);
@@ -59,7 +60,7 @@ lockersRoutes.post('/admin/cache/hard-refresh', authorize(Role.ADMIN), lockerSta
 lockersRoutes.get('/oper/stations', authorize(Role.OPERATOR), validateRequest(getAdminStationsQuerySchema), lockerStationController.getAllStation);
 lockersRoutes.get('/oper/stations/:id', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
 lockersRoutes.patch('/oper/stations/:id/status', authorize(Role.OPERATOR), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
-lockersRoutes.patch('/oper/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
+lockersRoutes.patch('/oper/boxes/:id/status', authorize(Role.OPERATOR), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
 lockersRoutes.patch('/oper/boxes/:id/tech-status', authorize(Role.OPERATOR), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.patch('/oper/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
 lockersRoutes.patch('/oper/stations/:id/delete', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.deleteStation);
