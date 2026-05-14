@@ -41,6 +41,27 @@ Backend (after polling SUCCESS/FAILED):
   └── Update BookingTable status
 ```
 
+### Booking end flow
+
+```
+Backend → SQS: { operationId, type: BOOKING_END, payload: { userId, stationId, lockerBoxId, bookingId, clientRequestId, requestedAt } }
+
+CommandHandler → bookingEndService
+  ├── Load booking from BookingTable
+  │     ├── not found            → FAILED (BOOKING_NOT_FOUND)
+  │     ├── already ENDED        → SUCCESS (idempotent)
+  │     ├── status ≠ ACTIVE      → FAILED (BOOKING_NOT_ACTIVE)
+  │     └── userId/stationId/lockerBoxId mismatch → FAILED (LOCKER_BOOKING_MISMATCH)
+  ├── Reuse LOCKER_CLOSE device logic (runCloseAttempts, 3 retries)
+  │     ├── already LOCKED+CLOSED → skip (user closed it manually)
+  │     ├── UNLOCKED+OPEN         → run close attempts
+  │     └── other states          → FAILED (LOCKER_STATE_INVALID)
+  └── On success:
+        ├── BookingTable: status → ENDED, set endTime + updatedAt, ttl=0
+        ├── LockerCacheTable: status → AVAILABLE
+        └── OperationsTable: SUCCESS with BookingEndResult
+```
+
 ### Booking TTL cleanup (DynamoDB Streams)
 
 ```
@@ -74,7 +95,10 @@ lambda/
 │   │   ├── healthCheck.ts                   # Sync health check (API Gateway)
 │   │   ├── booking/
 │   │   │   ├── bookingInitService.ts         # Create booking + Stripe Checkout session
-│   │   │   ├── bookingExtendService.ts       # Extend booking end time
+│   │   │   ├── bookingExtendService.ts       # Initiate extend + Stripe Checkout
+│   │   │   ├── bookingExtendConfirmService.ts # Finalize extend after Stripe webhook
+│   │   │   ├── bookingCancelService.ts       # Cancel booking, release locker
+│   │   │   ├── bookingEndService.ts          # End active booking, close locker, release
 │   │   │   ├── paymentConfirmService.ts      # Confirm Stripe payment, activate booking
 │   │   │   └── bookingTtlCleanup.ts          # DynamoDB Streams: handle expired bookings
 │   │   ├── cache/
@@ -83,7 +107,7 @@ lambda/
 │   │       ├── commandHandler.ts             # SQS consumer — routes by OperationType
 │   │       ├── lambdaHealthService.ts        # HEALTH_CHECK command handler
 │   │       ├── securityEventService.ts       # SECURITY_EVENT command handler
-│   │       ├── lockerCommandService.ts       # LOCKER_OPEN / LOCKER_CLOSE handlers
+│   │       ├── lockerCommandService.ts       # LOCKER_OPEN/CLOSE + batch variants
 │   │       └── lockerDeviceSimulator.ts      # IoT device stub (swap for real HTTP in prod)
 │   ├── db/
 │   │   └── dynamodb.ts                       # DynamoDB client + all table operations
@@ -120,17 +144,23 @@ lambda/
 | `SECURITY_EVENT` | `securityEventService` | Log security events |
 | `BOOKING_INIT` | `bookingInitService` | Create booking + Stripe Checkout |
 | `PAYMENT_CONFIRM` | `paymentConfirmService` | Confirm payment, activate booking |
-| `BOOKING_EXTEND` | `bookingExtendService` | Extend booking end time |
+| `BOOKING_EXTEND` | `bookingExtendService` | Start extend flow + Stripe Checkout |
+| `BOOKING_EXTEND_CONFIRM` | `bookingExtendConfirmService` | Finalize extend after Stripe webhook |
+| `BOOKING_CANCEL` | `bookingCancelService` | Cancel booking, release locker |
+| `BOOKING_END` | `bookingEndService` | End active booking, close locker, mark cache `AVAILABLE` |
 | `LOCKER_OPEN` | `lockerCommandService` | Open locker door via device |
 | `LOCKER_CLOSE` | `lockerCommandService` | Close and lock locker via device |
+| `LOCKER_OPEN_BATCH` | `lockerCommandService` | Batch open (operator/admin maintenance) |
+| `LOCKER_CLOSE_BATCH` | `lockerCommandService` | Batch close (operator/admin maintenance) |
 
 ## DynamoDB Tables
 
 | Table | Key | Purpose |
 |---|---|---|
 | `locker-{env}-operations-dynamodb` | `operationId` | Async operation state (PENDING → SUCCESS/FAILED) |
-| `locker-{env}-booking` | `bookingId` | Bookings with TTL + DynamoDB Streams |
+| `locker-{env}-booking` | `bookingId` | Bookings with TTL + DynamoDB Streams (GSI: `GSI1` on `GSI1PK = userId`) |
 | `locker-{env}-locker-cache` | `lockerBoxId` | Real-time locker availability (GSI: `stationId-index`) |
+| `locker-{env}-device-state` | `lockerBoxId` | Sensor-reported lock + door state (GSI: `stationId-index`) |
 
 ## Prerequisites
 
@@ -271,6 +301,7 @@ PENDING → PROCESSING → SUCCESS | FAILED
 | `OPEN_ATTEMPTS_EXHAUSTED` | System | All retry attempts to open failed |
 | `CLOSE_ATTEMPTS_EXHAUSTED` | System | All retry attempts to close failed |
 | `BATCH_OPEN_FAILED` | System | Batch open operation failed |
+| `BATCH_CLOSE_FAILED` | System | Batch close operation failed |
 
 ## CloudWatch Logs
 
@@ -303,6 +334,8 @@ sam logs --name CommandHandlerFunction --stack-name locker-lambda-dev --region e
 | `OPERATIONS_TABLE` | DynamoDB operations table name |
 | `BOOKING_TABLE` | DynamoDB booking table name |
 | `LOCKER_CACHE_TABLE` | DynamoDB locker cache table name |
+| `LOCKER_DEVICE_STATE_TABLE` | DynamoDB sensor state table name |
+| `FRONTEND_BASE_URL` | Used in Stripe success/cancel URLs |
 
 ## Team
 
