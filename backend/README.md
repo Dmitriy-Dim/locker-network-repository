@@ -206,7 +206,7 @@ REDIS_STATION_CACHE_TTL_SECONDS=300
 DYNAMO_ROLE_ARN=                        # Optional: assume-role ARN for DynamoDB/SQS access
 DYNAMO_ROLE_SESSION_NAME=locker-backend-dynamo
 DYNAMO_TABLE_NAME=locker-dev-operations-dynamodb
-DYNAMO_BOOKINGS_TABLE_NAME=locker-dev-bookings-dynamodb
+DYNAMO_BOOKINGS_TABLE_NAME=locker-dev-booking
 DYNAMO_LOCKER_CACHE_TABLE_NAME=locker-dev-locker-cache
 OPERATIONS_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
 CACHE_PROJECTION_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-cache-projection
@@ -372,7 +372,7 @@ What LocalStack bootstraps automatically:
 - DynamoDB tables:
   - `locker-dev-operations-dynamodb`
   - `locker-dev-locker-cache`
-  - `locker-dev-bookings-dynamodb`
+  - `locker-dev-booking`
 - Local operations Lambda:
   - `locker-command-handler`
 - Local cache projection Lambda:
@@ -382,7 +382,7 @@ Current locker cache write path:
 
 `backend -> locker-dev-cache-projection -> locker-cache-projection-handler -> locker-dev-locker-cache`
 
-Booking init, extension, cancellation, and payment confirmation stage booking state in `locker-dev-bookings-dynamodb`.
+Booking init, extension, cancellation, and payment confirmation stage booking state in `locker-dev-booking`.
 Station cache is not handled by this lambda flow. Stations remain backend-owned via Redis cache with RDS fallback.
 
 Bootstrap files:

@@ -326,6 +326,7 @@ Supported `status` values:
 ### `locker-dev-bookings-dynamodb`
 
 PK: `bookingId`
+GSI: `GSI1` with partition key `GSI1PK = userId`
 
 Initial pending booking:
 
@@ -334,6 +335,7 @@ Initial pending booking:
   "bookingId": "bk_001",
   "operationId": "op_001",
   "userId": "user_123",
+  "GSI1PK": "user_123",
   "stationId": "station_123",
   "lockerBoxId": "locker_55",
   "size": "M",
@@ -458,14 +460,14 @@ Lambda должна:
 - найти доступный locker в `locker-dev-locker-cache`
 - проверить station и locker state
 - обновить locker status в cache до `RESERVED`
-- создать staging booking в `locker-dev-bookings-dynamodb`
+- создать staging booking в `locker-dev-booking`
 - обновить operation в `locker-dev-operations-dynamodb` до `SUCCESS`
 
 ### `PAYMENT_CONFIRM`
 
 Lambda должна:
 
-- прочитать booking из `locker-dev-bookings-dynamodb`
+- прочитать booking из `locker-dev-booking`
 - проверить:
   - booking существует
   - TTL не истек
