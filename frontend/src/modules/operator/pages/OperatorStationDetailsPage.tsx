@@ -4,19 +4,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
     Box, Typography, Paper, Chip, Select, MenuItem, FormControl,
-    Stack, Button, ToggleButton, ToggleButtonGroup, Tooltip
+    Stack, Button, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 
 import Grid from '@mui/material/GridLegacy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 
 import { stationsApi } from '../../../api/stationsApi';
 import { useLockers } from '../../../hooks/useLockers';
 
 import { ExpiredLockerModal } from './ExpiredLockerModal';
-import { BatchOperationsModal } from "./BatchOperationModal";
+import { BatchOperationsModal } from './BatchOperationModal';
 
 import type {
     LockerStation,
@@ -61,7 +60,7 @@ export default function OperatorStationDetailsPage() {
     const navigate = useNavigate();
     const qc = useQueryClient();
 
-    const { changeLockerTechStatus, changeLockerStatus } = useLockers();
+    const { changeLockerTechStatus, changeLockerStatus: _changeLockerStatus } = useLockers();
 
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [techFilter, setTechFilter] = useState<string>('ALL');
@@ -95,9 +94,10 @@ export default function OperatorStationDetailsPage() {
     const handleTechChange = (lockerId: string, newStatus: LockerTechStatus) => {
         changeLockerTechStatus({ lockerBoxId: lockerId, techStatus: newStatus });
     };
-
+    // @ts-expect-error — preserved colleague's code, not yet wired to UI
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleBusinessStatusChange = (lockerId: string, newStatus: LockerStatus) => {
-        changeLockerStatus({ lockerBoxId: lockerId, status: newStatus });
+        _changeLockerStatus({ lockerBoxId: lockerId, status: newStatus });
     };
 
     const handleWatch = (locker: LockerBox) => {
