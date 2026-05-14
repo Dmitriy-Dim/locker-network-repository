@@ -116,6 +116,7 @@ export class AuthServiceImplPostgres {
                 select: {
                     userId: true,
                     role: true,
+                    isDeleted: true,
                 },
             });
         } catch (error) {
@@ -146,6 +147,7 @@ export class AuthServiceImplPostgres {
                 userId: true,
                 password: true,
                 role: true,
+                isDeleted: true,
             },
         });
 
@@ -162,6 +164,24 @@ export class AuthServiceImplPostgres {
                 entityId: email,
                 entityType: 'User',
                 details: { email, reason: 'User not found' },
+            });
+            throw new HttpError(401, 'Invalid credentials');
+        }
+
+        if (user.isDeleted) {
+            void logSecurityEvent({
+                req,
+                actorId: user.userId,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Login failed: user is deleted",
+                details: { email },
+            });
+            await logAudit({
+                req,
+                action: ActionType.USER_LOGIN_FAILED,
+                actorId: user.userId,
+                entityId: user.userId,
+                details: { email, reason: 'User is deleted' },
             });
             throw new HttpError(401, 'Invalid credentials');
         }
@@ -235,8 +255,27 @@ export class AuthServiceImplPostgres {
             select: {
                 userId: true,
                 role: true,
+                isDeleted: true,
             },
         });
+
+        if (user?.isDeleted) {
+            void logSecurityEvent({
+                req,
+                actorId: user.userId,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Google login failed: user is deleted",
+                details: { email },
+            });
+            await logAudit({
+                req,
+                action: ActionType.USER_LOGIN_FAILED,
+                actorId: user.userId,
+                entityId: user.userId,
+                details: { authProvider: "google", email, reason: "User is deleted" },
+            });
+            throw new HttpError(401, "Invalid Google token");
+        }
 
         if (!user) {
             user = await prismaService.user.create({
@@ -248,6 +287,7 @@ export class AuthServiceImplPostgres {
                 select: {
                     userId: true,
                     role: true,
+                    isDeleted: true,
                 },
             });
 
@@ -329,7 +369,7 @@ export class AuthServiceImplPostgres {
 
         const session = await prismaService.refreshSession.findUnique({
             where: { id: payload.sessionId },
-            include: { user: { select: { userId: true, role: true } } },
+            include: { user: { select: { userId: true, role: true, isDeleted: true } } },
         });
 
         if (!session || session.userId !== payload.userId) {
@@ -342,6 +382,23 @@ export class AuthServiceImplPostgres {
                 details: { sessionId: payload.sessionId },
             });
             throw new HttpError(401, 'Session not found');
+        }
+
+        if (session.user.isDeleted) {
+            await prismaService.refreshSession.updateMany({
+                where: { userId: session.userId, revokedAt: null },
+                data: { revokedAt: new Date() },
+            });
+
+            tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: session.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: user is deleted",
+                details: { sessionId: session.id },
+            });
+            throw new HttpError(401, "Invalid refresh token");
         }
 
         if (session.revokedAt) {

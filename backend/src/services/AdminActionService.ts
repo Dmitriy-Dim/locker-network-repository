@@ -214,6 +214,15 @@ export class AdminActions {
                                 isDeleted: true,
                             }
                         });
+                        await tx.refreshSession.updateMany({
+                            where: {
+                                userId,
+                                revokedAt: null,
+                            },
+                            data: {
+                                revokedAt: new Date(),
+                            },
+                        });
                         return deletedUser;
                     });
                     await logAudit({

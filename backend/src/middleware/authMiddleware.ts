@@ -41,6 +41,7 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
             select: {
                 userId: true,
                 role: true,
+                isDeleted: true,
             },
         });
 
@@ -50,6 +51,20 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
                 actorId: decoded.userId,
                 eventType: SecurityEventType.AUTH_USER_NOT_REGISTERED,
                 reason: "Access token subject does not match a registered user",
+                details: {
+                    sessionId: decoded.sessionId,
+                    tokenRole: decoded.role,
+                },
+            });
+            return next(new HttpError(401, "Invalid token"));
+        }
+
+        if (registeredUser.isDeleted) {
+            void logSecurityEvent({
+                req,
+                actorId: decoded.userId,
+                eventType: SecurityEventType.AUTH_INVALID_TOKEN,
+                reason: "Access token subject belongs to a deleted user",
                 details: {
                     sessionId: decoded.sessionId,
                     tokenRole: decoded.role,
