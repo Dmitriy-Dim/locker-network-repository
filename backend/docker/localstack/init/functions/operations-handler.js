@@ -7,7 +7,7 @@ const { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateComma
 const dynamoDocClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const OPERATIONS_TABLE = process.env.OPERATIONS_TABLE || "locker-dev-operations-dynamodb";
-const BOOKINGS_TABLE = process.env.BOOKINGS_TABLE || "locker-dev-bookings-dynamodb";
+const BOOKINGS_TABLE = process.env.BOOKINGS_TABLE || "locker-dev-booking";
 const LOCKER_CACHE_TABLE = process.env.LOCKER_CACHE_TABLE || "locker-dev-locker-cache";
 
 const BOOKING_STATUS = {
@@ -220,6 +220,7 @@ async function handleBookingInit(operationId, payload) {
     bookingId,
     operationId,
     userId,
+    GSI1PK: userId,
     stationId,
     lockerBoxId: locker.lockerBoxId,
     size,

@@ -7,7 +7,7 @@ OPERATIONS_QUEUE="locker-operations-queue"
 CACHE_PROJECTION_QUEUE="locker-dev-cache-projection"
 OPERATIONS_TABLE="locker-dev-operations-dynamodb"
 LOCKER_CACHE_TABLE="locker-dev-locker-cache"
-BOOKINGS_TABLE="locker-dev-bookings-dynamodb"
+BOOKINGS_TABLE="locker-dev-booking-dynamodb"
 TS_LAMBDA_DIR="/opt/locker-localstack/ts-lambda"
 OPERATIONS_ZIP_PATH="/tmp/operations-handler.zip"
 CACHE_PROJECTION_ZIP_PATH="/tmp/cache-projection-handler.zip"
@@ -61,6 +61,32 @@ ensure_dynamodb_table() {
       --table-name "${TABLE_NAME}" \
       --attribute-definitions "AttributeName=${KEY_NAME},AttributeType=S" \
       --key-schema "AttributeName=${KEY_NAME},KeyType=HASH" \
+      --billing-mode PAY_PER_REQUEST >/dev/null
+  fi
+}
+
+ensure_booking_table() {
+  if ! table_exists "${BOOKINGS_TABLE}"; then
+    awslocal dynamodb create-table \
+      --table-name "${BOOKINGS_TABLE}" \
+      --attribute-definitions \
+        AttributeName=bookingId,AttributeType=S \
+        AttributeName=GSI1PK,AttributeType=S \
+      --key-schema AttributeName=bookingId,KeyType=HASH \
+      --global-secondary-indexes '[
+        {
+          "IndexName": "GSI1",
+          "KeySchema": [
+            {
+              "AttributeName": "GSI1PK",
+              "KeyType": "HASH"
+            }
+          ],
+          "Projection": {
+            "ProjectionType": "ALL"
+          }
+        }
+      ]' \
       --billing-mode PAY_PER_REQUEST >/dev/null
   fi
 }
@@ -124,7 +150,7 @@ ensure_queue "${CACHE_PROJECTION_QUEUE}"
 echo "[localstack-init] creating dynamodb tables"
 ensure_dynamodb_table "${OPERATIONS_TABLE}" "operationId"
 ensure_dynamodb_table "${LOCKER_CACHE_TABLE}" "lockerBoxId"
-ensure_dynamodb_table "${BOOKINGS_TABLE}" "bookingId"
+ensure_booking_table
 
 echo "[localstack-init] packaging lambda"
 python3 - <<'PY'
