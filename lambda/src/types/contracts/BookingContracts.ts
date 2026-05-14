@@ -54,6 +54,29 @@ export interface BookingExtendCommand {
   };
 }
 
+// ─── BOOKING_END: SQS command from backend when user ends booking ───
+export interface BookingEndCommand {
+  type: 'BOOKING_END';
+  operationId: string;
+  payload: {
+    userId: string;
+    stationId: string;
+    lockerBoxId: string;
+    bookingId: string;
+    clientRequestId: string;
+    requestedAt: string;
+  };
+}
+
+// ─── Operation result for BOOKING_END ───
+export interface BookingEndResult {
+  bookingStatus: 'ENDED';
+  previousStatus: string;
+  endTime: string;
+  lockStatus: string;
+  doorStatus: string;
+}
+
 // ─── BOOKING_EXTEND_CONFIRM: SQS command from backend after Stripe webhook ───
 export interface BookingExtendConfirmCommand {
   type: 'BOOKING_EXTEND_CONFIRM';
@@ -87,10 +110,11 @@ export interface BookingRecord {
   bookingId: string;
   operationId: string;
   userId: string;
+  GSI1PK: string;
   stationId: string;
   lockerBoxId: string;
   size: string;
-  status: 'PENDING' | 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
+  status: 'PENDING' | 'ACTIVE' | 'CANCELLED' | 'EXPIRED' | 'ENDED';
   paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   expectedEndTime: string;
   expiresAt: string;
@@ -105,6 +129,7 @@ export interface BookingRecord {
   paymentConfirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  endTime?: string;
   pendingExtendEndTime?: string;
   extendPaymentSessionId?: string;
   extendPaymentUrl?: string;
