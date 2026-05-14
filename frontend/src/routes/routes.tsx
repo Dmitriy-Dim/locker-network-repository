@@ -35,7 +35,8 @@ import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStatio
 import AdminUsersTables from "../modules/admin/pages/AdminUsersTables";
 
 import { PricingDashboard } from "../modules/admin/pages/PricingDashboard";
-import AdminAlertsPage from "../modules/admin/pages/AdminAlertsPage.tsx";
+import AdminAlertsPage from "../modules/admin/pages/AdminAlertsPage";
+import AdminUsersPage from "../modules/admin/pages/AdminUsersPage";
 
 export function AppRoutes() {
     return (
@@ -81,6 +82,7 @@ export function AppRoutes() {
             >
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUsersTables />} />
+                <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="stations/:stationId" element={<StationDetailsPage />} />
                 <Route path="pricing" element={<PricingDashboard />} />
                 <Route path="alerts/cloudwatch" element={<AdminAlertsPage />} />

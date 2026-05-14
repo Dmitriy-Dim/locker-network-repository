@@ -15,5 +15,8 @@ export enum Paths {
     PRICING_ADMIN = "/admin/pricing",
 
     ALERTS_ADMIN = "/admin/alerts/cloudwatch",
-    ALERTS_OPERATOR = "/operator/alerts"
+    ALERTS_OPERATOR = "/operator/alerts",
+
+    USERS_ADMIN = "/admin/users",
+    USER_MANAGEMENT_ADMIN = "/admin/user-management",
 }

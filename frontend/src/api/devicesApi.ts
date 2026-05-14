@@ -2,25 +2,49 @@ import { apiClient } from "./apiClient";
 
 export interface DeviceOperationData {
     operationId: string;
-    type: "LOCKER_OPEN" | "LOCKER_CLOSE" | "LOCKER_OPEN_BATCH" | "BOOKING_CANCEL";
-    status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED";
+    type: "LOCKER_OPEN" | "LOCKER_CLOSE" | "LOCKER_OPEN_BATCH" | "LOCKER_CLOSE_BATCH" | "BOOKING_CANCEL";
+    status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED"| "EXPIRED";
     bookingId?: string;
     lockerBoxId?: string;
     stationId?: string;
+    timestamp?: string;
+    errorCode?: string;
+    errorMessage?: string;
+
+    // user single locker fields (top level from document)
+    lockStatus?: "UNLOCKED" | "LOCKED";
+    doorStatus?: "OPEN" | "CLOSED";
+    attemptCount?: number;
+    maxAttempts?: number;
+    nextAction?: "CHANGE_LOCKER" | "CLOSE_LOCKER" | "NONE";
+    message?: string;
+
+    // batch fields (top level from document)
+    mode?: string;
+    total?: number;
+    opened?: { lockerBoxId: string; lockStatus: string; doorStatus: string }[];
+    failed?: { lockerBoxId: string; lockStatus?: string; doorStatus?: string; errorCode?: string; errorMessage?: string }[];
+    openedCount?: number;
+    failedCount?: number;
+
+    closed?: { lockerBoxId: string; lockStatus: string; doorStatus: string }[];
+    closedCount?: number;
+    releasedCount?: number;
+
     result?: {
-        lockStatus: "UNLOCKED" | "LOCKED";
-        doorStatus: "OPEN" | "CLOSED";
+        lockStatus?: "UNLOCKED" | "LOCKED";
+        doorStatus?: "OPEN" | "CLOSED";
         attemptCount?: number;
         maxAttempts?: number;
         nextAction?: "CHANGE_LOCKER" | "CLOSE_LOCKER" | "NONE";
         message?: string;
-        mode?: string;
-        status?: string;
-        total?: number;
-        openedCount?: number;
-        failedCount?: number;
         opened?: any[];
         failed?: any[];
+        openedCount?: number;
+        failedCount?: number;
+        total?: number;
+        mode?: string;
+        status?: string;
     };
 
     payment?: {
@@ -29,9 +53,6 @@ export interface DeviceOperationData {
         paymentIntentId?: string;
         paymentUrl?: string;
     };
-    errorCode?: string;
-    errorMessage?: string;
-    timestamp?: string;
 }
 
 export interface DeviceOperationResponse {
@@ -62,8 +83,12 @@ export const devicesApi = {
         return data.data;
     },
 
-    closeLockerOperator: async (lockerBoxId: string): Promise<DeviceOperationData> => {
-        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', { lockerBoxId });
+    // closeLockerOperator: async (lockerBoxId: string): Promise<DeviceOperationData> => {
+    //     const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', { lockerBoxId });
+    //     return data.data;
+    // },
+    closeLockerOperator: async (payload: { stationId: string; mode: string; lockerBoxIds?: string[]; status?: string; reason: string }): Promise<DeviceOperationData> => {
+        const { data } = await apiClient.post<DeviceOperationResponse>('/devices/oper/close-locker', payload);
         return data.data;
     },
 

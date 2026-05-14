@@ -1,165 +1,228 @@
-import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { stationsApi } from "../../../api/stationsApi";
-import { useLockers } from "../../../hooks/useLockers";
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { LockerStation, LockerTechStatus, LockerStatus } from "../../../types/index";
 import {
-    Box,
-    Typography,
-    Paper,
-    Chip,
-    Select,
-    MenuItem,
-    FormControl,
-    Stack
-} from "@mui/material";
-import Grid from "@mui/material/GridLegacy";
+    Box, Typography, Paper, Chip, Select, MenuItem, FormControl,
+    Stack, Button, ToggleButton, ToggleButtonGroup, Tooltip
+} from '@mui/material';
 
-const getChipColor = (status: string) => {
+import Grid from '@mui/material/GridLegacy';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+
+import { stationsApi } from '../../../api/stationsApi';
+import { useLockers } from '../../../hooks/useLockers';
+
+import { ExpiredLockerModal } from './ExpiredLockerModal';
+import { BatchOperationsModal } from "./BatchOperationModal";
+
+import type {
+    LockerStation,
+    LockerTechStatus,
+    LockerStatus
+} from '../../../types/index';
+
+interface LockerBox {
+    lockerBoxId: string;
+    code: string;
+    size: 'S' | 'M' | 'L';
+    status: string;
+    techStatus: string;
+    pricePerHour?: string;
+}
+
+const getTechChipColor = (status: string): 'success' | 'error' | 'warning' | 'default' => {
     switch (status) {
-        case "ACTIVE": return "success";
-        case "MAINTENANCE":
-        case "FAULTY": return "error";
-        case "INACTIVE": return "default";
-        default: return "default";
+        case 'ACTIVE': return 'success';
+        case 'MAINTENANCE':
+        case 'FAULTY': return 'error';
+        case 'INACTIVE': return 'default';
+        default: return 'default';
     }
 };
 
-const getBusinessStatusColor = (status: string) => {
+const getStatusChipColor = (status: string): 'success' | 'error' | 'warning' | 'default' => {
     switch (status) {
-        case "AVAILABLE":
-            return "success";
-
-        case "RESERVED":
-            return "warning";
-
-        case "OCCUPIED":
-            return "error";
-
-        case "EXPIRED":
-            return "secondary";
-
-        default:
-            return "default";
+        case 'AVAILABLE': return 'success';
+        case 'EXPIRED': return 'error';
+        case 'OCCUPIED': return 'warning';
+        case 'RESERVED': return 'warning';
+        default: return 'default';
     }
 };
+
+const ALL_STATUSES = ['ALL', 'AVAILABLE', 'RESERVED', 'OCCUPIED', 'EXPIRED'];
+const ALL_TECH_STATUSES = ['ALL', 'ACTIVE', 'INACTIVE', 'MAINTENANCE', 'FAULTY'];
 
 export default function OperatorStationDetailsPage() {
-    const { stationId } = useParams();
-const { changeLockerTechStatus, changeLockerStatus } = useLockers();
+    const { stationId } = useParams<{ stationId: string }>();
+    const navigate = useNavigate();
+    const qc = useQueryClient();
 
-    const { data: station } = useQuery<LockerStation>({
-        queryKey: ["operator-station", stationId],
+    const { changeLockerTechStatus, changeLockerStatus } = useLockers();
+
+    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [techFilter, setTechFilter] = useState<string>('ALL');
+
+    const [selectedLocker, setSelectedLocker] = useState<LockerBox | null>(null);
+    const [singleModalOpen, setSingleModalOpen] = useState(false);
+
+    const [batchModalOpen, setBatchModalOpen] = useState(false);
+
+    const { data: station, isLoading } = useQuery<LockerStation>({
+        queryKey: ['operator-station', stationId],
         queryFn: () => stationsApi.getOperatorStationById(stationId!),
-        enabled: !!stationId
+        enabled: !!stationId,
     });
 
-    const lockers = station?.lockers ?? [];
-
-    const handleChange = (lockerId: string, newStatus: LockerTechStatus) => {
-        changeLockerTechStatus({
-            lockerBoxId: lockerId,
-            techStatus: newStatus
-        });
-    };
-
-    const handleBusinessStatusChange = (
-        lockerId: string,
-        newStatus: LockerStatus
-    ) => {
-        changeLockerStatus({
-            lockerBoxId: lockerId,
-            status: newStatus
-        });
-    };
+    const lockers: LockerBox[] = (station?.lockers ?? []) as LockerBox[];
 
     const cityName =
-        typeof station?.city === "string"
+        typeof station?.city === 'string'
             ? station.city
-            : station?.city?.name ?? "Unknown city";
+            : (station?.city as any)?.name ?? 'Unknown city';
+
+    const filtered = lockers.filter((l) => {
+        const statusMatch = statusFilter === 'ALL' || l.status === statusFilter;
+        const techMatch = techFilter === 'ALL' || l.techStatus === techFilter;
+        return statusMatch && techMatch;
+    });
+
+    const expiredCount = lockers.filter((l) => l.status === 'EXPIRED').length;
+
+    const handleTechChange = (lockerId: string, newStatus: LockerTechStatus) => {
+        changeLockerTechStatus({ lockerBoxId: lockerId, techStatus: newStatus });
+    };
+
+    const handleBusinessStatusChange = (lockerId: string, newStatus: LockerStatus) => {
+        changeLockerStatus({ lockerBoxId: lockerId, status: newStatus });
+    };
+
+    const handleWatch = (locker: LockerBox) => {
+        setSelectedLocker(locker);
+        setSingleModalOpen(true);
+    };
+
+    const handleRefresh = () => {
+        qc.invalidateQueries({ queryKey: ['operator-station', stationId] });
+    };
+
+    if (isLoading) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography color="text.secondary">Loading…</Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: 3 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={3}>
+                <Box>
+                    <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
+                        Back
+                    </Button>
 
-            {/* 🔥 HEADER СТАНЦИИ */}
-            <Stack spacing={0.5} mb={3}>
-                <Typography variant="h4" fontWeight={800}>
-                    Station Details
-                </Typography>
+                    <Typography variant="h4">Station Details</Typography>
+                    <Typography>{cityName}</Typography>
+                    <Typography>{station?.address}</Typography>
+                </Box>
 
-                <Typography variant="subtitle1" color="text.secondary">
-                    {cityName}
-                </Typography>
-
-                <Typography variant="body2" color="text.secondary">
-                    {station?.address}
-                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<LockOpenIcon />}
+                    onClick={() => setBatchModalOpen(true)}
+                >
+                    Batch Operations
+                </Button>
             </Stack>
 
+            {expiredCount > 0 && (
+                <Paper sx={{ p: 2, mb: 3, bgcolor: '#fff5f5' }}>
+                    <Typography color="error">
+                        {expiredCount} expired lockers require attention
+                    </Typography>
+                </Paper>
+            )}
+
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Stack direction="row" spacing={2}>
+                    <ToggleButtonGroup
+                        value={statusFilter}
+                        exclusive
+                        onChange={(_, v) => v && setStatusFilter(v)}
+                    >
+                        {ALL_STATUSES.map((s) => (
+                            <ToggleButton key={s} value={s}>{s}</ToggleButton>
+                        ))}
+                    </ToggleButtonGroup>
+
+                    <ToggleButtonGroup
+                        value={techFilter}
+                        exclusive
+                        onChange={(_, v) => v && setTechFilter(v)}
+                    >
+                        {ALL_TECH_STATUSES.map((s) => (
+                            <ToggleButton key={s} value={s}>{s}</ToggleButton>
+                        ))}
+                    </ToggleButtonGroup>
+                </Stack>
+            </Paper>
+
             <Grid container spacing={2}>
-                {lockers.map((locker) => (
+                {filtered.map((locker) => (
                     <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
                         <Paper sx={{ p: 2 }}>
                             <Typography>Box #{locker.code}</Typography>
 
-                            <Chip
-                                label={locker.techStatus}
-                                color={getChipColor(locker.techStatus)}
-                                size="small"
-                                sx={{ mt: 1 }}
-                            />
+                            <Chip label={locker.status} color={getStatusChipColor(locker.status)} />
+                            <Chip label={locker.techStatus} color={getTechChipColor(locker.techStatus)} />
 
-                            <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-                                Business Status
-                            </Typography>
-
-                            <Chip
-                                label={locker.status ?? 'NO_STATUS'}
-                                color={getBusinessStatusColor(locker.status ?? 'NO_STATUS')}
-                                size="small"
-                                sx={{ mt: 0.5 }}
-                            />
-
-                            <FormControl fullWidth sx={{ mt: 2 }}>
+                            <FormControl fullWidth>
                                 <Select
-                                    size="small"
                                     value={locker.techStatus}
                                     onChange={(e) =>
-                                        handleChange(
-                                            locker.lockerBoxId,
-                                            e.target.value as LockerTechStatus
-                                        )
+                                        handleTechChange(locker.lockerBoxId, e.target.value as LockerTechStatus)
                                     }
                                 >
-                                    <MenuItem value="INACTIVE">INACTIVE</MenuItem>
                                     <MenuItem value="ACTIVE">ACTIVE</MenuItem>
+                                    <MenuItem value="INACTIVE">INACTIVE</MenuItem>
                                     <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
                                     <MenuItem value="FAULTY">FAULTY</MenuItem>
                                 </Select>
                             </FormControl>
 
-                            <FormControl fullWidth sx={{ mt: 2 }}>
-                                <Select
-                                    size="small"
-                                    value={locker.status ?? ''}
-                                    onChange={(e) =>
-                                        handleBusinessStatusChange(
-                                            locker.lockerBoxId,
-                                            e.target.value as LockerStatus
-                                        )
-                                    }
-                                >
-                                    <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
-                                    <MenuItem value="RESERVED">RESERVED</MenuItem>
-                                    <MenuItem value="OCCUPIED">OCCUPIED</MenuItem>
-                                    <MenuItem value="EXPIRED">EXPIRED</MenuItem>
-                                </Select>
-                            </FormControl>
+                            {locker.status === 'EXPIRED' && (
+                                <Button onClick={() => handleWatch(locker)}>
+                                    Watch
+                                </Button>
+                            )}
                         </Paper>
                     </Grid>
                 ))}
             </Grid>
+
+            <ExpiredLockerModal
+                open={singleModalOpen}
+                locker={selectedLocker}
+                station={{
+                    stationId: stationId!,
+                    address: station?.address ?? '',
+                    city: cityName
+                }}
+                onClose={() => setSingleModalOpen(false)}
+                onDone={handleRefresh}
+            />
+
+            <BatchOperationsModal
+                open={batchModalOpen}
+                stationId={stationId!}
+                stationLabel={`${cityName} · ${station?.address ?? ''}`}
+                onClose={() => setBatchModalOpen(false)}
+                onDone={handleRefresh}
+            />
         </Box>
     );
 }

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useOperatorBatchOperation } from '../../../hooks/useOperatorBatchOperation';
 
 export function OperatorBatchPanel({ stationId }: { stationId: string }) {
-    const { openBatch, operation, isWorking, resetOperation } = useOperatorBatchOperation();
-
+    // const { openBatch, operation, isWorking, resetOperation } = useOperatorBatchOperation();
+    const { openBatch, openOperation: operation, isWorking, resetOperation } = useOperatorBatchOperation();
     const [mode, setMode] = useState<'ALL' | 'STATUS' | 'IDS'>('ALL');
     const [statusFilter, setStatusFilter] = useState('OCCUPIED');
     const [idsInput, setIdsInput] = useState('');

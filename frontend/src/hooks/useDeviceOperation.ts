@@ -14,12 +14,15 @@ export function useDeviceOperation(role: Role = 'user') {
     const openFn =
         role === 'operator'
             ? (params: UserDevicePayload) =>
-                devicesApi.openLockerOperator({ mode: 'SINGLE', lockerBoxIds: [params.lockerBoxId], reason: 'operator action' })
+                // devicesApi.openLockerOperator({ mode: 'SINGLE', lockerBoxIds: [params.lockerBoxId], reason: 'operator action' })
+                devicesApi.openLockerOperator({ stationId: params.stationId, mode: 'IDS', lockerBoxIds: [params.lockerBoxId], reason: 'operator action' })
             : devicesApi.openLockerUser;
 
     const closeFn =
         role === 'operator'
-            ? (params: UserDevicePayload) => devicesApi.closeLockerOperator(params.lockerBoxId)
+            ? (params: UserDevicePayload) =>
+                // devicesApi.closeLockerOperator(params.lockerBoxId)
+                devicesApi.closeLockerOperator({ stationId: params.stationId, mode: 'IDS', lockerBoxIds: [params.lockerBoxId], reason: 'operator action' })
             : devicesApi.closeLockerUser;
 
     const openMutation = useMutation({
