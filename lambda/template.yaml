@@ -157,9 +157,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: bookingId
           AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
       KeySchema:
         - AttributeName: bookingId
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
       TimeToLiveSpecification:
         AttributeName: ttl
