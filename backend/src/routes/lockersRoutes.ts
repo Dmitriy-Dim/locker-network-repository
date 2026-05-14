@@ -36,7 +36,7 @@ lockersRoutes.get('/boxes/:id', authorize(Role.USER), validateRequest(oneLockerS
 lockersRoutes.get('/stations/:id', authorize(Role.USER), validateRequest(oneStationSchema), lockerStationController.getOneStation);
 
 // user locker switch
-//lockersRoutes.get('/stations/switch',  authorize(Role.USER))
+//lockersRoutes.get('/stations/switch',  authorize(Role.USER), validate)
 
 // admin/operator routes backed by RDS
 lockersRoutes.get('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(getAdminLockersQuerySchema), lockerBoxController.getAllBoxes);
