@@ -9,7 +9,8 @@ import { BookingInitCommand, PaymentConfirmCommand, BookingExtendCommand } from 
 import { LockerBatchCommand } from '../../types/contracts/OperationContracts';
 import { handleBookingExtend } from '../booking/bookingExtendService';
 import { handleBookingCancel } from '../booking/bookingCancelService';
-import { BookingCancelCommand } from '../../types/contracts/BookingContracts';
+import { BookingCancelCommand, BookingEndCommand } from '../../types/contracts/BookingContracts';
+import { handleBookingEnd } from '../booking/bookingEndService';
 import { handleBookingExtendConfirm } from '../booking/bookingExtendConfirmService';
 import { BookingExtendConfirmCommand } from '../../types/contracts/BookingContracts';
 import { handleBookingInit } from '../booking/bookingInitService';
@@ -51,6 +52,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
  
         case OperationType.BOOKING_CANCEL:
           await handleBookingCancel(command as unknown as BookingCancelCommand);
+          break;
+
+        case OperationType.BOOKING_END:
+          await handleBookingEnd(command as unknown as BookingEndCommand);
           break;
 
         case OperationType.BOOKING_EXTEND:
