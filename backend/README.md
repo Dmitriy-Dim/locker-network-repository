@@ -526,6 +526,9 @@ The detailed route contracts live next to the owning modules:
 - Locker cache DynamoDB contract: [docs/contracts/locker-cache-dynamo.md](./docs/contracts/locker-cache-dynamo.md)
 - Security event transport: [docs/contracts/logger-contracts.md](./docs/contracts/logger-contracts.md)
 - Security event taxonomy: [docs/contracts/logger-events.md](./docs/contracts/logger-events.md)
+- Devices: [docs/devices.md](./docs/devices.md)
+- Payments: [docs/payments.md](./docs/payments.md)
+- Users: [docs/users.md](./docs/users.md)
 
 ---
 

@@ -171,6 +171,7 @@ export class AdminActions {
                 phone: true,
                 email: true,
                 role: true,
+                isDeleted: true,
             }
         })
         if (!user) {
@@ -196,7 +197,7 @@ export class AdminActions {
                             throw new HttpError(404, "User not found");
                         }
                         if (user.isDeleted === true) {
-                            throw new HttpError(400, "User already deleted");
+                            throw new HttpError(409, "User already deleted");
                         }
                         const deletedUser = await tx.user.update({
                             where: {userId},
@@ -210,6 +211,7 @@ export class AdminActions {
                                 phone: true,
                                 email: true,
                                 role: true,
+                                isDeleted: true,
                             }
                         });
                         return deletedUser;
@@ -268,7 +270,7 @@ export class AdminActions {
                             throw new HttpError(404, "User not found");
                         }
                         if (user.isDeleted === false) {
-                            throw new HttpError(400, "User already active");
+                            throw new HttpError(409, "User already active");
                         }
                         const restoredUser = await tx.user.update({
                             where: {userId},
@@ -282,6 +284,7 @@ export class AdminActions {
                                 phone: true,
                                 email: true,
                                 role: true,
+                                isDeleted: true,
                             }
                         });
                         return restoredUser;
