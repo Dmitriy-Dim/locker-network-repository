@@ -96,8 +96,8 @@ export async function getAllUserBookings(userId: string) {
     do {
         const result = await dynamoDocClient.send(new QueryCommand({
             TableName: BOOKINGS_TABLE_NAME,
-            IndexName: "userId",
-            KeyConditionExpression: "userId = :userId",
+            IndexName: "GSI1",
+            KeyConditionExpression: "GSI1PK = :userId",
             ExpressionAttributeValues: {
                 ":userId": userId,
             },

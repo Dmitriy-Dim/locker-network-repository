@@ -8,6 +8,7 @@ export type BookingRecordDto = {
     bookingId: string;
     operationId?: string;
     userId: string;
+    GSI1PK?: string;
     stationId: string;
     lockerBoxId: string;
     size: "S" | "M" | "L";

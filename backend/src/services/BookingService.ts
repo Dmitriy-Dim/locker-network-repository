@@ -29,7 +29,7 @@ import {
     sendBookingInitToQueue,
     sendBookingStatusUpdateToQueue,
 } from "./sqsService";
-import {getAllBookings, getBooking, getLockerCache} from "./dynamoService";
+import {getAllBookings, getAllUserBookings, getBooking, getLockerCache} from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
 import {prismaService} from "./prismaService";
 
@@ -1064,15 +1064,13 @@ export class BookingService {
             throw new HttpError(401, "Unauthorized");
         }
 
-        // const allBookings = await getAllUserBookings(userId) as BookingRecordDto[];
-        const allBookings = await getAllBookings() as BookingRecordDto[];
+        const allBookings = await getAllUserBookings(userId) as BookingRecordDto[];
         const status = req.query.status as BookingStatus | undefined;
         const lockerBoxId = req.query.lockerBoxId as string | undefined;
         const stationId = req.query.stationId as string | undefined;
         const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
         const skip = Number(req.query.skip ?? 0);
         const ownBookings = allBookings
-            .filter((booking) => !userId || booking.userId === userId)
             .filter((booking) => !status || booking.status === status)
             .filter((booking) => !lockerBoxId || booking.lockerBoxId === lockerBoxId)
             .filter((booking) => !stationId || booking.stationId === stationId);
