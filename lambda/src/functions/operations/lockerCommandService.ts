@@ -71,7 +71,7 @@ export const runOpenAttempts = async (lockerBoxId: string): Promise<AttemptResul
   return { success: false, lockStatus, doorStatus, attemptCount: MAX_ATTEMPTS, errorCode, errorMessage };
 };
 
-const runCloseAttempts = async (lockerBoxId: string): Promise<AttemptResult> => {
+export const runCloseAttempts = async (lockerBoxId: string): Promise<AttemptResult> => {
   let lockStatus: LockStatus = 'UNLOCKED';
   let doorStatus: DoorStatus = 'OPEN';
   let errorCode: LockerErrorCode | undefined;
