@@ -45,7 +45,7 @@ const statusColor = (s: string): 'success' | 'error' | 'warning' | 'default' => 
 export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: Props) {
     const {
         openBatch, openOperation, isOpenPending,
-        closeBatch, closeOperation, isClosePending, closeSucceeded,
+        closeBatch, closeOperation, isClosePending, closeSucceeded, closeFailed,
         resetOperation,
         openError, closeError,
     } = useOperatorBatchOperation();
@@ -81,22 +81,22 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
         onClose();
     };
 
+    // open batch — backend returns opened[]
     const openedBox = openOperation?.opened?.[0] ?? null;
     const failedBox = openOperation?.failed?.[0] ?? null;
     const openSucceeded = openOperation?.status === 'SUCCESS' && (openOperation?.openedCount ?? 0) > 0;
-    const openFailed = openOperation?.status === 'FAILED';
+    const openFailed = openOperation?.status === 'FAILED' || openOperation?.status === 'EXPIRED';
 
-    const closedBox = closeOperation?.opened?.[0] ?? null;
-    const closeFailed = closeOperation?.status === 'FAILED';
-
+    // close batch — backend returns closed[] not opened[]
+    const closedBox = closeOperation?.closed?.[0] ?? null;
 
     const phase =
-        closeSucceeded        ? 'done'         :
-            closeFailed           ? 'close_error'  :
-                isClosePending        ? 'closing'       :
-                    openSucceeded         ? 'open_success'  :
-                        openFailed            ? 'open_error'    :
-                            isOpenPending         ? 'opening'       :
+        closeSucceeded   ? 'done'         :
+            closeFailed      ? 'close_error'  :
+                isClosePending   ? 'closing'      :
+                    openSucceeded    ? 'open_success' :
+                        openFailed       ? 'open_error'   :
+                            isOpenPending    ? 'opening'      :
                                 'idle';
 
     return (
@@ -118,7 +118,6 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
             </DialogTitle>
 
             <DialogContent>
-                {/* ── locker info card ── */}
                 <Box sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                     <Stack spacing={0.5}>
                         <Typography variant="subtitle2" color="text.secondary">
@@ -128,30 +127,16 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
                             Box #{locker.code}
                         </Typography>
                         <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
-                            <Chip
-                                label={locker.status}
-                                size="small"
-                                color={statusColor(locker.status)}
-                                sx={{ fontWeight: 700 }}
-                            />
-                            <Chip
-                                label={sizeLabel[locker.size]}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontWeight: 600 }}
-                            />
+                            <Chip label={locker.status} size="small" color={statusColor(locker.status)} sx={{ fontWeight: 700 }} />
+                            <Chip label={sizeLabel[locker.size]} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
                             {locker.pricePerHour && (
-                                <Typography variant="caption" color="text.secondary">
-                                    ₪{locker.pricePerHour}/h
-                                </Typography>
+                                <Typography variant="caption" color="text.secondary">₪{locker.pricePerHour}/h</Typography>
                             )}
                         </Stack>
                     </Stack>
                 </Box>
 
                 <Divider sx={{ mb: 2 }} />
-
-                {/* ── phase content ── */}
 
                 {phase === 'idle' && (
                     <Box textAlign="center" py={1}>
@@ -174,11 +159,7 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
 
                 {phase === 'open_success' && (
                     <Box>
-                        <Alert
-                            icon={<LockOpenIcon />}
-                            severity="success"
-                            sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}
-                        >
+                        <Alert icon={<LockOpenIcon />} severity="success" sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}>
                             Locker is open. Remove items and press Close.
                         </Alert>
                         {openedBox && (
@@ -201,14 +182,9 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
                     </Alert>
                 )}
 
-                {/* done */}
                 {phase === 'done' && (
                     <Box>
-                        <Alert
-                            icon={<CheckCircleOutlineIcon />}
-                            severity="success"
-                            sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}
-                        >
+                        <Alert icon={<CheckCircleOutlineIcon />} severity="success" sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}>
                             Locker closed. Status updated to <strong>AVAILABLE</strong>.
                         </Alert>
                         {closedBox && (
@@ -222,7 +198,7 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
 
                 {phase === 'close_error' && (
                     <Alert severity="error" icon={<ErrorOutlineIcon />} sx={{ borderRadius: 2 }}>
-                        {closeError?.message ?? 'Failed to close locker. Please retry or contact support.'}
+                        {closeOperation?.failed?.[0]?.errorMessage ?? closeError?.message ?? 'Failed to close locker. Please retry or contact support.'}
                     </Alert>
                 )}
             </DialogContent>
@@ -230,15 +206,12 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
                 {phase === 'idle' && (
                     <>
-                        <Button onClick={handleCancel} sx={{ color: '#64748b', fontWeight: 700 }}>
-                            Cancel
-                        </Button>
+                        <Button onClick={handleCancel} sx={{ color: '#64748b', fontWeight: 700 }}>Cancel</Button>
                         <Button
                             variant="contained"
                             startIcon={<LockOpenIcon />}
                             onClick={handleOpen}
-                            sx={{ bgcolor: '#e53e3e', fontWeight: 700, borderRadius: 2,
-                                '&:hover': { bgcolor: '#c53030' } }}
+                            sx={{ bgcolor: '#e53e3e', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#c53030' } }}
                         >
                             Open Locker
                         </Button>
@@ -254,8 +227,7 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
                         variant="contained"
                         startIcon={<LockIcon />}
                         onClick={handleClose}
-                        sx={{ bgcolor: '#6baf5c', fontWeight: 700, borderRadius: 2,
-                            '&:hover': { bgcolor: '#5a9a4d' } }}
+                        sx={{ bgcolor: '#6baf5c', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#5a9a4d' } }}
                     >
                         Close Locker
                     </Button>
@@ -277,9 +249,7 @@ export function ExpiredLockerModal({ open, locker, station, onClose, onDone }: P
 
                 {phase === 'open_error' && (
                     <>
-                        <Button onClick={handleCancel} sx={{ color: '#64748b', fontWeight: 700 }}>
-                            Cancel
-                        </Button>
+                        <Button onClick={handleCancel} sx={{ color: '#64748b', fontWeight: 700 }}>Cancel</Button>
                         <Button
                             variant="contained"
                             onClick={handleOpen}

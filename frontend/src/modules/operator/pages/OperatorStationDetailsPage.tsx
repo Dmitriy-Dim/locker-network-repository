@@ -4,12 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
     Box, Typography, Paper, Chip, Select, MenuItem, FormControl,
-    Stack, Button, ToggleButton, ToggleButtonGroup
+    Stack, Button, ToggleButton, ToggleButtonGroup, Tooltip
 } from '@mui/material';
 
 import Grid from '@mui/material/GridLegacy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import { stationsApi } from '../../../api/stationsApi';
 import { useLockers } from '../../../hooks/useLockers';
@@ -67,7 +68,6 @@ export default function OperatorStationDetailsPage() {
 
     const [selectedLocker, setSelectedLocker] = useState<LockerBox | null>(null);
     const [singleModalOpen, setSingleModalOpen] = useState(false);
-
     const [batchModalOpen, setBatchModalOpen] = useState(false);
 
     const { data: station, isLoading } = useQuery<LockerStation>({
@@ -94,6 +94,7 @@ export default function OperatorStationDetailsPage() {
     const handleTechChange = (lockerId: string, newStatus: LockerTechStatus) => {
         changeLockerTechStatus({ lockerBoxId: lockerId, techStatus: newStatus });
     };
+
     // @ts-expect-error — preserved colleague's code, not yet wired to UI
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleBusinessStatusChange = (lockerId: string, newStatus: LockerStatus) => {
@@ -119,100 +120,228 @@ export default function OperatorStationDetailsPage() {
 
     return (
         <Box sx={{ p: 3 }}>
+            {/* ── header ── */}
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={3}>
                 <Box>
-                    <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
+                    <Button
+                        startIcon={<ArrowBackIcon />}
+                        onClick={() => navigate(-1)}
+                        sx={{ mb: 1, color: '#6baf5c', fontWeight: 700 }}
+                    >
                         Back
                     </Button>
-
-                    <Typography variant="h4">Station Details</Typography>
-                    <Typography>{cityName}</Typography>
-                    <Typography>{station?.address}</Typography>
+                    <Typography variant="h4" fontWeight={800}>Station Details</Typography>
+                    <Typography variant="subtitle1" color="text.secondary">{cityName}</Typography>
+                    <Typography variant="body2" color="text.secondary">{station?.address}</Typography>
                 </Box>
 
                 <Button
                     variant="contained"
                     startIcon={<LockOpenIcon />}
                     onClick={() => setBatchModalOpen(true)}
+                    sx={{
+                        bgcolor: '#e53e3e', fontWeight: 700, borderRadius: 2, mt: 1,
+                        '&:hover': { bgcolor: '#c53030' }
+                    }}
                 >
                     Batch Operations
                 </Button>
             </Stack>
 
+            {/* ── expired banner ── */}
             {expiredCount > 0 && (
-                <Paper sx={{ p: 2, mb: 3, bgcolor: '#fff5f5' }}>
-                    <Typography color="error">
-                        {expiredCount} expired lockers require attention
-                    </Typography>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        mb: 3, p: 2, borderRadius: 2,
+                        bgcolor: '#fff5f5', border: '1px solid #fed7d7',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    }}
+                >
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip label={expiredCount} color="error" size="small" sx={{ fontWeight: 800 }} />
+                        <Typography fontWeight={600} color="error.main">
+                            expired {expiredCount === 1 ? 'locker requires' : 'lockers require'} attention
+                        </Typography>
+                    </Stack>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => setStatusFilter('EXPIRED')}
+                        sx={{ fontWeight: 700, borderRadius: 2 }}
+                    >
+                        Show expired
+                    </Button>
                 </Paper>
             )}
 
-            <Paper sx={{ p: 2, mb: 3 }}>
-                <Stack direction="row" spacing={2}>
-                    <ToggleButtonGroup
-                        value={statusFilter}
-                        exclusive
-                        onChange={(_, v) => v && setStatusFilter(v)}
-                    >
-                        {ALL_STATUSES.map((s) => (
-                            <ToggleButton key={s} value={s}>{s}</ToggleButton>
-                        ))}
-                    </ToggleButtonGroup>
+            {/* ── filters ── */}
+            <Paper
+                elevation={0}
+                sx={{
+                    mb: 3, p: 2, borderRadius: 2,
+                    border: '1px solid #e2e8f0', bgcolor: '#f8fafc'
+                }}
+            >
+                <Stack spacing={1.5}>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700} mb={0.5} display="block">
+                            BOOKING STATUS
+                        </Typography>
+                        <ToggleButtonGroup
+                            value={statusFilter}
+                            exclusive
+                            onChange={(_, v) => v && setStatusFilter(v)}
+                            size="small"
+                        >
+                            {ALL_STATUSES.map((s) => (
+                                <ToggleButton
+                                    key={s}
+                                    value={s}
+                                    sx={{
+                                        fontWeight: 700, fontSize: 11, px: 1.5,
+                                        '&.Mui-selected': {
+                                            bgcolor: s === 'EXPIRED' ? '#fed7d7' : '#dcfce7',
+                                            color: s === 'EXPIRED' ? '#c53030' : '#276749',
+                                        }
+                                    }}
+                                >
+                                    {s}
+                                </ToggleButton>
+                            ))}
+                        </ToggleButtonGroup>
+                    </Box>
 
-                    <ToggleButtonGroup
-                        value={techFilter}
-                        exclusive
-                        onChange={(_, v) => v && setTechFilter(v)}
-                    >
-                        {ALL_TECH_STATUSES.map((s) => (
-                            <ToggleButton key={s} value={s}>{s}</ToggleButton>
-                        ))}
-                    </ToggleButtonGroup>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700} mb={0.5} display="block">
+                            TECH STATUS
+                        </Typography>
+                        <ToggleButtonGroup
+                            value={techFilter}
+                            exclusive
+                            onChange={(_, v) => v && setTechFilter(v)}
+                            size="small"
+                        >
+                            {ALL_TECH_STATUSES.map((s) => (
+                                <ToggleButton
+                                    key={s}
+                                    value={s}
+                                    sx={{
+                                        fontWeight: 700, fontSize: 11, px: 1.5,
+                                        '&.Mui-selected': {
+                                            bgcolor: '#e0f2fe',
+                                            color: '#0369a1',
+                                        }
+                                    }}
+                                >
+                                    {s}
+                                </ToggleButton>
+                            ))}
+                        </ToggleButtonGroup>
+                    </Box>
+
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                            Showing {filtered.length} of {lockers.length} lockers
+                        </Typography>
+                        {(statusFilter !== 'ALL' || techFilter !== 'ALL') && (
+                            <Button
+                                size="small"
+                                onClick={() => { setStatusFilter('ALL'); setTechFilter('ALL'); }}
+                                sx={{ color: '#94a3b8', fontWeight: 700, fontSize: 11 }}
+                            >
+                                Clear filters
+                            </Button>
+                        )}
+                    </Stack>
                 </Stack>
             </Paper>
 
-            <Grid container spacing={2}>
-                {filtered.map((locker) => (
-                    <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
-                        <Paper sx={{ p: 2 }}>
-                            <Typography>Box #{locker.code}</Typography>
-
-                            <Chip label={locker.status} color={getStatusChipColor(locker.status)} />
-                            <Chip label={locker.techStatus} color={getTechChipColor(locker.techStatus)} />
-
-                            <FormControl fullWidth>
-                                <Select
-                                    value={locker.techStatus}
-                                    onChange={(e) =>
-                                        handleTechChange(locker.lockerBoxId, e.target.value as LockerTechStatus)
-                                    }
+            {/* ── locker grid ── */}
+            {filtered.length === 0 ? (
+                <Typography color="text.secondary" textAlign="center" py={4}>
+                    No lockers match the current filters.
+                </Typography>
+            ) : (
+                <Grid container spacing={2}>
+                    {filtered.map((locker) => {
+                        const isExpired = locker.status === 'EXPIRED';
+                        return (
+                            <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
+                                <Paper
+                                    sx={{
+                                        p: 2, borderRadius: 2,
+                                        border: isExpired ? '1.5px solid #fc8181' : '1px solid #e2e8f0',
+                                        bgcolor: isExpired ? '#fff5f5' : '#fff',
+                                        transition: 'box-shadow 0.15s',
+                                        '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }
+                                    }}
                                 >
-                                    <MenuItem value="ACTIVE">ACTIVE</MenuItem>
-                                    <MenuItem value="INACTIVE">INACTIVE</MenuItem>
-                                    <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
-                                    <MenuItem value="FAULTY">FAULTY</MenuItem>
-                                </Select>
-                            </FormControl>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                        <Typography fontWeight={700}>Box #{locker.code}</Typography>
+                                        <Chip label={locker.size} size="small" variant="outlined" sx={{ fontSize: 10, fontWeight: 700 }} />
+                                    </Stack>
 
-                            {locker.status === 'EXPIRED' && (
-                                <Button onClick={() => handleWatch(locker)}>
-                                    Watch
-                                </Button>
-                            )}
-                        </Paper>
-                    </Grid>
-                ))}
-            </Grid>
+                                    <Chip
+                                        label={locker.status || '—'}
+                                        color={getStatusChipColor(locker.status)}
+                                        size="small"
+                                        sx={{ mb: 1, fontWeight: 700 }}
+                                    />
+                                    <Chip
+                                        label={locker.techStatus}
+                                        color={getTechChipColor(locker.techStatus)}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ mb: 2, ml: 0.5, fontWeight: 600 }}
+                                    />
+
+                                    <FormControl fullWidth sx={{ mb: isExpired ? 1.5 : 0 }}>
+                                        <Select
+                                            size="small"
+                                            value={locker.techStatus}
+                                            onChange={(e) =>
+                                                handleTechChange(locker.lockerBoxId, e.target.value as LockerTechStatus)
+                                            }
+                                        >
+                                            <MenuItem value="INACTIVE">INACTIVE</MenuItem>
+                                            <MenuItem value="ACTIVE">ACTIVE</MenuItem>
+                                            <MenuItem value="MAINTENANCE">MAINTENANCE</MenuItem>
+                                            <MenuItem value="FAULTY">FAULTY</MenuItem>
+                                        </Select>
+                                    </FormControl>
+
+                                    {isExpired && (
+                                        <Tooltip title="Open & close expired locker">
+                                            <Button
+                                                fullWidth
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<VisibilityIcon />}
+                                                onClick={() => handleWatch(locker)}
+                                                sx={{
+                                                    bgcolor: '#e53e3e', fontWeight: 700,
+                                                    borderRadius: 2, fontSize: 12,
+                                                    '&:hover': { bgcolor: '#c53030' }
+                                                }}
+                                            >
+                                                Watch
+                                            </Button>
+                                        </Tooltip>
+                                    )}
+                                </Paper>
+                            </Grid>
+                        );
+                    })}
+                </Grid>
+            )}
 
             <ExpiredLockerModal
                 open={singleModalOpen}
                 locker={selectedLocker}
-                station={{
-                    stationId: stationId!,
-                    address: station?.address ?? '',
-                    city: cityName
-                }}
-                onClose={() => setSingleModalOpen(false)}
+                station={{ stationId: stationId!, address: station?.address ?? '', city: cityName }}
+                onClose={() => { setSingleModalOpen(false); setSelectedLocker(null); }}
                 onDone={handleRefresh}
             />
 

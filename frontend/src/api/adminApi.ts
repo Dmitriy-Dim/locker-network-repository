@@ -4,7 +4,7 @@ import type {AxiosResponse} from "axios";
 
 
 export const getUsers = async ():Promise<User[]>  => {
-    const response:AxiosResponse<User[]> = await apiClient.get("/admin/users")
+    const response:AxiosResponse<User[]> = await apiClient.get("/admin/users?includeDeleted=true")
     return response.data;
 }
 

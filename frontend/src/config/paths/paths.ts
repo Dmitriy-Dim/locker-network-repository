@@ -3,7 +3,6 @@ export enum Paths {
     USER = "/user",
     OPERATOR = "/operator",
     LOGIN = "/login",
-    ERROR = "/error",
     REGISTER = "/register",
     INFO = "/info",
     PRICE = "/price",
@@ -18,5 +17,5 @@ export enum Paths {
     ALERTS_OPERATOR = "/operator/alerts",
 
     USERS_ADMIN = "/admin/users",
-    USER_MANAGEMENT_ADMIN = "/admin/user-management",
+    AUDIT_ADMIN = "/admin/audit-logs",
 }

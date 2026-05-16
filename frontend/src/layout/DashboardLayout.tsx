@@ -1,19 +1,9 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-    AppBar,
-    Box,
-    Button,
-    Divider,
-    Drawer,
-    IconButton,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Toolbar,
-    Typography
+    AppBar, Box, Button, Divider, Drawer, IconButton,
+    List, ListItem, ListItemButton, ListItemIcon, ListItemText,
+    Toolbar, Typography
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -21,7 +11,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import PeopleIcon from '@mui/icons-material/People';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import HistoryIcon from '@mui/icons-material/History';
 
 import { useAuth } from '../hooks/useAuth.ts';
 import { ROLES } from '../config/roles/roles.ts';
@@ -65,8 +55,8 @@ export default function DashboardLayout() {
             return [
                 { text: 'Dashboard', path: Paths.ADMIN, icon: <DashboardIcon /> },
                 { text: 'Active Alerts', path: Paths.ALERTS_ADMIN, icon: <NotificationsIcon /> },
-                { text: 'Users', path: Paths.USERS_ADMIN, icon: <PeopleIcon /> },
-                { text: 'User Management', path: Paths.USER_MANAGEMENT_ADMIN, icon: <ManageAccountsIcon /> },
+                { text: 'Users Management', path: Paths.USERS_ADMIN, icon: <PeopleIcon /> },
+                { text: 'Audit Logs', path: Paths.AUDIT_ADMIN, icon: <HistoryIcon /> },
                 { text: 'Pricing', path: Paths.PRICING_ADMIN, icon: <AttachMoneyIcon /> },
             ];
         }
@@ -78,12 +68,7 @@ export default function DashboardLayout() {
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Box display="flex" justifyContent="center" mb={3}>
-                    <img
-                        src="/logo_app.png"
-                        alt="logo"
-                        width={200}
-                        height={120}
-                    />
+                    <img src="/logo_app.png" alt="logo" width={200} height={120} />
                 </Box>
             </Box>
 
@@ -92,7 +77,6 @@ export default function DashboardLayout() {
             <List sx={{ px: 2, flexGrow: 1 }}>
                 {getMenuItems().map((item) => {
                     const isActive = location.pathname === item.path;
-
                     return (
                         <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
                             <ListItemButton
@@ -108,13 +92,8 @@ export default function DashboardLayout() {
                                     },
                                 }}
                             >
-                                <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-                                    {item.icon}
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{ fontWeight: isActive ? 700 : 600 }}
-                                />
+                                <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>{item.icon}</ListItemIcon>
+                                <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: isActive ? 700 : 600 }} />
                             </ListItemButton>
                         </ListItem>
                     );
@@ -147,21 +126,13 @@ export default function DashboardLayout() {
                     </IconButton>
 
                     <Box display="flex" alignItems="center" gap={2}>
-                        <Typography
-                            variant="body2"
-                            fontWeight={700}
-                            sx={{ color: '#64748b', display: { xs: 'none', sm: 'block' } }}
-                        >
+                        <Typography variant="body2" fontWeight={700} sx={{ color: '#64748b', display: { xs: 'none', sm: 'block' } }}>
                             Role: <span style={{ color: '#6baf5c' }}>{user?.role}</span>
                         </Typography>
                     </Box>
 
                     <Box display="flex" alignItems="center" gap={3}>
-                        <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            sx={{ display: { xs: 'none', sm: 'block' } }}
-                        >
+                        <Typography variant="body2" fontWeight={600} sx={{ display: { xs: 'none', sm: 'block' } }}>
                             {user?.email}
                         </Typography>
                         <Button
@@ -170,11 +141,8 @@ export default function DashboardLayout() {
                             onClick={handleLogout}
                             startIcon={<LogoutIcon />}
                             sx={{
-                                borderRadius: 2,
-                                textTransform: 'none',
-                                fontWeight: 'bold',
-                                color: '#e53935',
-                                borderColor: '#e53935',
+                                borderRadius: 2, textTransform: 'none', fontWeight: 'bold',
+                                color: '#e53935', borderColor: '#e53935',
                                 '&:hover': { bgcolor: '#ffebee', borderColor: '#d32f2f' },
                             }}
                         >
@@ -184,48 +152,26 @@ export default function DashboardLayout() {
                 </Toolbar>
             </AppBar>
 
-            <Box
-                component="nav"
-                sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
-            >
+            <Box component="nav" sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}>
                 <Drawer
                     variant="temporary"
                     open={mobileOpen}
                     onClose={() => setMobileOpen(false)}
                     ModalProps={{ keepMounted: true }}
-                    sx={{
-                        display: { xs: 'block', sm: 'none' },
-                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
-                    }}
+                    sx={{ display: { xs: 'block', sm: 'none' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH } }}
                 >
                     {drawerContent}
                 </Drawer>
-
                 <Drawer
                     variant="permanent"
-                    sx={{
-                        display: { xs: 'none', sm: 'block' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: DRAWER_WIDTH,
-                            borderRight: '1px solid #e2e8f0',
-                        },
-                    }}
+                    sx={{ display: { xs: 'none', sm: 'block' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH, borderRight: '1px solid #e2e8f0' } }}
                     open
                 >
                     {drawerContent}
                 </Drawer>
             </Box>
 
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    p: { xs: 2, sm: 4 },
-                    width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-                    mt: '64px',
-                }}
-            >
+            <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 4 }, width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` }, mt: '64px' }}>
                 <Box sx={{ maxWidth: '1100px', margin: '0 auto' }}>
                     <Outlet />
                 </Box>
