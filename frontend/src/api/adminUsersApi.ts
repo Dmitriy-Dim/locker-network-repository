@@ -10,27 +10,27 @@ export interface AdminUser {
 }
 
 export const adminUsersApi = {
-    /** GET /api/v1/admin/users */
+    /** GET /admin/users */
     getAll: async (): Promise<AdminUser[]> => {
-        const { data } = await apiClient.get('/api/v1/admin/users');
+        const { data } = await apiClient.get('/admin/users');
         return data?.data ?? data;
     },
 
-    /** GET /api/v1/admin/users/:id */
+    /** GET /admin/users/:id */
     getById: async (userId: string): Promise<AdminUser> => {
-        const { data } = await apiClient.get(`/api/v1/admin/users/${userId}`);
+        const { data } = await apiClient.get(`/admin/users/${userId}`);
         return data?.data ?? data;
     },
 
-    /** DELETE /api/v1/admin/users/:id */
+    /** DELETE /admin/users/:id */
     deleteUser: async (userId: string): Promise<AdminUser> => {
-        const { data } = await apiClient.delete(`/api/v1/admin/users/${userId}`);
+        const { data } = await apiClient.delete(`/admin/users/${userId}`);
         return data?.data?.result ?? data;
     },
 
-    /** PATCH /api/v1/admin/users/:id/restore */
+    /** PATCH /admin/users/:id/restore */
     restoreUser: async (userId: string): Promise<AdminUser> => {
-        const { data } = await apiClient.patch(`/api/v1/admin/users/${userId}/restore`);
+        const { data } = await apiClient.patch(`/admin/users/${userId}/restore`);
         return data?.data?.result ?? data;
     },
 };
