@@ -141,6 +141,7 @@ export class AdminActions {
                 role: true,
                 createdAt: true,
                 updatedAt: true,
+                isDeleted: true,
             },
             orderBy: {
                 createdAt: "desc",
