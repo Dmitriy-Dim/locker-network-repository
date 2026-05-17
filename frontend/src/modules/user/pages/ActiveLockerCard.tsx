@@ -248,7 +248,8 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const address = booking.stationAddress || `Station ${shortId(stationId)}`;
     const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
-    const accentColor = timerStatus === 'heavilyOverdue' ? '#dc2626' : timerStatus === 'expired' ? '#f59e0b' : '#16a34a';
+    // const accentColor = timerStatus === 'heavilyOverdue' ? '#dc2626' : timerStatus === 'expired' ? '#f59e0b' : '#16a34a';
+    const accentColor ='#dc2626';
 
     const handleOpenExtendModal = () => {
         const currentEnd = booking.expectedEndTime ? new Date(booking.expectedEndTime) : new Date();
@@ -307,10 +308,13 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                     size="small"
                                     sx={{
                                         fontWeight: 700, fontSize: '0.7rem',
-                                        bgcolor: isActive ? '#dcfce7' : '#fee2e2',
-                                        color: isActive ? '#15803d' : '#dc2626',
-                                        border: `1px solid ${isActive ? '#bbf7d0' : '#fecaca'}`,
-                                    }}
+                                        // bgcolor: isActive ? '#dcfce7' : '#fee2e2',
+                                        // color: isActive ? '#15803d' : '#dc2626',
+                                        // border: `1px solid ${isActive ? '#bbf7d0' : '#fecaca'}`,
+                                        bgcolor: '#fee2e2',
+                                        color: '#dc2626',
+                                        border: '1px solid #bbf7d0',
+                                }}
                                 />
                             </Stack>
                             <Typography variant="h4" fontWeight={900} color="#1e293b" mb={1}>
