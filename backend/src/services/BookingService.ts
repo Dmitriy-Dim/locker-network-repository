@@ -175,6 +175,66 @@ function parseOptionalDate(value: unknown) {
     return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function isOverdueActiveBooking(booking: BookingRecordDto, now = new Date()) {
+    if (booking.status !== BookingStatus.ACTIVE) {
+        return false;
+    }
+
+    const expectedEndTime = parseOptionalDate(booking.expectedEndTime);
+    return Boolean(expectedEndTime && expectedEndTime <= now);
+}
+
+async function expireOverdueBookingOnRead(booking: BookingRecordDto, actorId?: string) {
+    if (!isOverdueActiveBooking(booking)) {
+        return booking.status;
+    }
+
+    const operationId = uuidv4();
+    const expectedEndTime = parseOptionalDate(booking.expectedEndTime);
+
+    await prismaService.booking.updateMany({
+        where: {
+            bookingId: booking.bookingId,
+            status: BookingStatus.ACTIVE,
+        },
+        data: {
+            status: BookingStatus.EXPIRED,
+            endTime: expectedEndTime ?? new Date(),
+        },
+    });
+
+    await operationRepository.create({
+        operationId,
+        userId: actorId ?? booking.userId,
+        timestamp: new Date().toISOString(),
+        status: OperationStatus.PENDING,
+        type: OperationType.BOOKING_UPDATE_STATUS,
+        bookingId: booking.bookingId,
+        lockerBoxId: booking.lockerBoxId,
+    });
+
+    await sendBookingStatusUpdateToQueue({
+        operationId,
+        type: OperationType.BOOKING_UPDATE_STATUS,
+        payload: {
+            bookingId: booking.bookingId,
+            actorId: actorId ?? booking.userId,
+            status: BookingStatus.EXPIRED,
+        },
+    });
+
+    logger.info("Overdue active booking expired during read", {
+        operationId,
+        bookingId: booking.bookingId,
+        previousStatus: booking.status,
+        nextStatus: BookingStatus.EXPIRED,
+        expectedEndTime: booking.expectedEndTime,
+        sourceOfTruth: "dynamodb-read-repair",
+    });
+
+    return BookingStatus.EXPIRED;
+}
+
 function resolveDynamoBookingStatus(status: string) {
     return Object.values(BookingStatus).includes(status as BookingStatus)
         ? status as BookingStatus
@@ -352,6 +412,7 @@ export class BookingService {
         const role = req.user?.role;
         const userId = req.user?.userId;
         const stationAddress = locker?.station?.address ?? await getStationAddressById(booking.stationId);
+        const bookingStatus = await expireOverdueBookingOnRead(booking, userId);
 
         if (role === Role.USER && booking.userId !== userId) {
             throw new HttpError(403, "Access denied");
@@ -372,7 +433,7 @@ export class BookingService {
         return sendSuccess(res, toPublicBookingResponse({
             bookingId: booking.bookingId,
             paymentStatus: booking.paymentStatus ?? "PENDING",
-            bookingStatus: booking.status,
+            bookingStatus,
             lockerStatus,
             lockerCode: locker?.code ?? null,
             stationAddress,
@@ -1110,10 +1171,11 @@ export class BookingService {
         const result = await Promise.all(
             ownBookings.slice(skip, limit === undefined ? undefined : skip + limit).map(async (booking) => {
                 const locker = await getLockerCache(booking.lockerBoxId);
+                const bookingStatus = await expireOverdueBookingOnRead(booking, userId);
                 return toPublicBookingResponse({
                     bookingId: booking.bookingId,
                     paymentStatus: booking.paymentStatus ?? "PENDING",
-                    bookingStatus: booking.status,
+                    bookingStatus,
                     lockerStatus: booking.lockerStatus ?? locker?.status ?? null,
                     lockerCode: locker?.code ?? null,
                     stationAddress: locker?.station?.address ?? stationAddressMap.get(booking.stationId) ?? null,
