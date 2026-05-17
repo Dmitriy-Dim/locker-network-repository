@@ -41,7 +41,7 @@ function toPublicBookingResponse(input: {
     bookingStatus: string;
     lockerStatus?: string | null;
     lockerCode?: string | null;
-    stationAddress?: string | null;
+    stationAddress: string | null;
     lockerBoxId: string;
     stationId: string;
     startTime: Date | string | null;
@@ -66,9 +66,7 @@ function toPublicBookingResponse(input: {
         bookingStatus: input.bookingStatus,
         ...(shouldExposeLockerDetails && input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
         ...(shouldExposeLockerDetails && input.lockerCode ? { code: input.lockerCode} : {}),
-        ...(shouldExposeLockerDetails && input.stationAddress !== undefined
-            ? {stationAddress: input.stationAddress}
-            : {}),
+        stationAddress: input.stationAddress,
         ...(isReservedBooking && input.expiresAt
             ? {
                 expiresAt: input.expiresAt instanceof Date
@@ -100,6 +98,37 @@ function toQueuedBookingOperationResponse<T extends Record<string, unknown>>(
         ...(payload ?? {}),
         ...(message ? { message } : {}),
     };
+}
+
+async function getStationAddressById(stationId: string) {
+    const station = await prismaService.lockerStation.findUnique({
+        where: { stationId },
+        select: { address: true },
+    });
+
+    return station?.address ?? null;
+}
+
+async function getStationAddressMap(stationIds: string[]) {
+    const uniqueStationIds = [...new Set(stationIds)];
+
+    if (uniqueStationIds.length === 0) {
+        return new Map<string, string | null>();
+    }
+
+    const stations = await prismaService.lockerStation.findMany({
+        where: {
+            stationId: {
+                in: uniqueStationIds,
+            },
+        },
+        select: {
+            stationId: true,
+            address: true,
+        },
+    });
+
+    return new Map(stations.map((station) => [station.stationId, station.address ?? null]));
 }
 
 function resolveRequestedExpectedEndTime(req: Request) {
@@ -322,6 +351,7 @@ export class BookingService {
         const { booking, locker, lockerStatus } = bookingWithLocker;
         const role = req.user?.role;
         const userId = req.user?.userId;
+        const stationAddress = locker?.station?.address ?? await getStationAddressById(booking.stationId);
 
         if (role === Role.USER && booking.userId !== userId) {
             throw new HttpError(403, "Access denied");
@@ -345,7 +375,7 @@ export class BookingService {
             bookingStatus: booking.status,
             lockerStatus,
             lockerCode: locker?.code ?? null,
-            stationAddress: locker?.station?.address ?? null,
+            stationAddress,
             lockerBoxId: booking.lockerBoxId,
             stationId: booking.stationId,
             startTime: booking.startTime ?? null,
@@ -1076,6 +1106,7 @@ export class BookingService {
             .filter((booking) => !status || booking.status === status)
             .filter((booking) => !lockerBoxId || booking.lockerBoxId === lockerBoxId)
             .filter((booking) => !stationId || booking.stationId === stationId);
+        const stationAddressMap = await getStationAddressMap(ownBookings.map((booking) => booking.stationId));
         const result = await Promise.all(
             ownBookings.slice(skip, limit === undefined ? undefined : skip + limit).map(async (booking) => {
                 const locker = await getLockerCache(booking.lockerBoxId);
@@ -1085,7 +1116,7 @@ export class BookingService {
                     bookingStatus: booking.status,
                     lockerStatus: booking.lockerStatus ?? locker?.status ?? null,
                     lockerCode: locker?.code ?? null,
-                    stationAddress: locker?.station?.address ?? null,
+                    stationAddress: locker?.station?.address ?? stationAddressMap.get(booking.stationId) ?? null,
                     lockerBoxId: booking.lockerBoxId,
                     stationId: booking.stationId,
                     startTime: booking.startTime ?? null,
