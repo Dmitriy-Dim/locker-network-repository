@@ -32,7 +32,6 @@ const cardBase = {
     '&:hover': { boxShadow: '0 8px 32px rgba(0,0,0,0.10)' },
 };
 
-// Строка с иконкой
 function InfoRow({ icon, text, size = 'body2' }: { icon: React.ReactNode; text: string; size?: any }) {
     return (
         <Stack direction="row" spacing={1} alignItems="center">
@@ -248,8 +247,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const address = booking.stationAddress || `Station ${shortId(stationId)}`;
     const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
-    // const accentColor = timerStatus === 'heavilyOverdue' ? '#dc2626' : timerStatus === 'expired' ? '#f59e0b' : '#16a34a';
-    const accentColor ='#dc2626';
+    const accentColor = timerStatus === 'heavilyOverdue' ? '#dc2626' : timerStatus === 'expired' ? '#f59e0b' : '#16a34a';
 
     const handleOpenExtendModal = () => {
         const currentEnd = booking.expectedEndTime ? new Date(booking.expectedEndTime) : new Date();
@@ -308,13 +306,10 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                                     size="small"
                                     sx={{
                                         fontWeight: 700, fontSize: '0.7rem',
-                                        // bgcolor: isActive ? '#dcfce7' : '#fee2e2',
-                                        // color: isActive ? '#15803d' : '#dc2626',
-                                        // border: `1px solid ${isActive ? '#bbf7d0' : '#fecaca'}`,
-                                        bgcolor: '#fee2e2',
-                                        color: '#dc2626',
-                                        border: '1px solid #bbf7d0',
-                                }}
+                                        bgcolor: isActive ? '#dcfce7' : '#fee2e2',
+                                        color: isActive ? '#15803d' : '#dc2626',
+                                        border: `1px solid ${isActive ? '#bbf7d0' : '#fecaca'}`,
+                                    }}
                                 />
                             </Stack>
                             <Typography variant="h4" fontWeight={900} color="#1e293b" mb={1}>
@@ -455,24 +450,17 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
     const endDateStr = booking.expectedEndTime
         ? new Date(booking.expectedEndTime).toLocaleDateString([], { dateStyle: 'medium' })
         : null;
-    const accentColor = isHeavilyOverdue ? '#dc2626' : '#f59e0b';
-
     return (
-        <Paper elevation={0} sx={{ ...cardBase, border: `1px solid ${accentColor}30` }}>
+        <Paper elevation={0} sx={{ ...cardBase, border: '1px solid #fecaca', bgcolor: '#fff8f8' }}>
             <Stack direction={{ xs: 'column', md: 'row' }}>
-                <Box sx={{ width: { md: 6 }, height: { xs: 6, md: 'auto' }, bgcolor: accentColor, flexShrink: 0, borderRadius: { xs: '16px 16px 0 0', md: '16px 0 0 16px' } }} />
+                <Box sx={{ width: { md: 6 }, height: { xs: 6, md: 'auto' }, bgcolor: '#dc2626', flexShrink: 0, borderRadius: { xs: '16px 16px 0 0', md: '16px 0 0 16px' } }} />
                 <Stack direction={{ xs: 'column', md: 'row' }} flex={1} justifyContent="space-between">
                     <Box sx={{ p: 3, flex: 1 }}>
                         <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
                             <Chip
                                 label={isHeavilyOverdue ? 'ITEMS MOVED' : 'OVERDUE'}
                                 size="small"
-                                sx={{
-                                    fontWeight: 700, fontSize: '0.7rem',
-                                    bgcolor: isHeavilyOverdue ? '#fee2e2' : '#fef3c7',
-                                    color: isHeavilyOverdue ? '#dc2626' : '#b45309',
-                                    border: `1px solid ${isHeavilyOverdue ? '#fecaca' : '#fde68a'}`,
-                                }}
+                                sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca' }}
                             />
                         </Stack>
                         <InfoRow icon={<LocationOnIcon sx={{ fontSize: 16 }} />} text={address} />
@@ -486,13 +474,13 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                         </Box>
                         {endDateStr && (
                             <Stack direction="row" spacing={0.5} alignItems="center" mt={1}>
-                                <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                                <Typography variant="caption" color="text.secondary">Expired {endDateStr}</Typography>
+                                <CalendarTodayIcon sx={{ fontSize: 14, color: '#f87171' }} />
+                                <Typography variant="caption" color="#ef4444">Expired {endDateStr}</Typography>
                             </Stack>
                         )}
                     </Box>
 
-                    <Divider orientation={{ md: 'vertical' } as any} flexItem sx={{ borderColor: `${accentColor}20` }} />
+                    <Divider orientation={{ md: 'vertical' } as any} flexItem sx={{ borderColor: '#fecaca' }} />
 
                     <Box sx={{ p: 3, minWidth: { md: 260 }, display: 'flex', alignItems: 'center' }}>
                         {isHeavilyOverdue ? (
@@ -502,13 +490,13 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
                             </Alert>
                         ) : (
                             <Stack spacing={1.5} width="100%">
-                                <Box sx={{ p: 2, bgcolor: '#fffbeb', borderRadius: 2, textAlign: 'center', border: '1px solid #fde68a' }}>
-                                    <Typography variant="caption" color="#92400e" fontWeight={700} display="block">Payment required</Typography>
-                                    <Typography variant="caption" color="#b45309">Your booking has expired</Typography>
+                                <Box sx={{ p: 2, bgcolor: '#fee2e2', borderRadius: 2, textAlign: 'center', border: '1px solid #fecaca' }}>
+                                    <Typography variant="caption" color="#991b1b" fontWeight={700} display="block">Payment required</Typography>
+                                    <Typography variant="caption" color="#dc2626">Your booking has expired</Typography>
                                 </Box>
-                                <Button variant="contained" color="warning" fullWidth
+                                <Button variant="contained" fullWidth
                                         onClick={() => alert("Redirecting to Pay Overdue Amount")}
-                                        sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none' }}>
+                                        sx={{ borderRadius: 2, fontWeight: 800, textTransform: 'none', bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}>
                                     Pay Overdue Amount
                                 </Button>
                             </Stack>
@@ -552,7 +540,7 @@ export function HistoryLockerCard({ booking }: { booking: any }) {
         }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ p: 2.5 }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
                 <Stack direction="row" spacing={2} alignItems="center" flex={1}>
-
+                    {/* Цветной индикатор */}
                     <Box sx={{ width: 4, height: 40, bgcolor: color, borderRadius: 4, flexShrink: 0 }} />
                     <Box>
                         <Typography variant="body2" fontWeight={700} color="#64748b" sx={{ fontFamily: 'monospace', letterSpacing: 1 }}>
