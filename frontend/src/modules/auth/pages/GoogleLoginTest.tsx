@@ -6,7 +6,7 @@ import { ROLES } from "../../../config/roles/roles.ts";
 import { Paths } from "../../../config/paths/paths.ts";
 
 const GoogleLoginTest = () => {
-    const { googleLogin } = useContext(AuthContext);
+    const { googleLogin } = useContext(AuthContext)!;
     const navigate = useNavigate();
 
 

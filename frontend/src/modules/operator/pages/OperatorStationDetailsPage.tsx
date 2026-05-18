@@ -95,7 +95,6 @@ export default function OperatorStationDetailsPage() {
         changeLockerTechStatus({ lockerBoxId: lockerId, techStatus: newStatus });
     };
 
-    // @ts-expect-error — preserved colleague's code, not yet wired to UI
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleBusinessStatusChange = (lockerId: string, newStatus: LockerStatus) => {
         _changeLockerStatus({ lockerBoxId: lockerId, status: newStatus });
