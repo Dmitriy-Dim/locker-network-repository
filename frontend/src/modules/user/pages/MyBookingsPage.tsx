@@ -11,17 +11,46 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import { ActiveLockerCard, HistoryLockerCard, ActionRequiredLockerCard } from "./ActiveLockerCard.tsx";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useMyBookings } from "../../../hooks/useMyBookings.ts";
+import { useStations } from "../../../hooks/useStations.ts";
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 
 export default function MyBookingsPage() {
     const navigate = useNavigate();
     const { data: bookings = [], isLoading } = useMyBookings();
+    const { stations } = useStations({ publicOnly: true, limit: 1000 });
     const [tabIndex, setTabIndex] = useState(0);
     const [now] = useState(() => Date.now());
 
-    const { activeBookings, reservedBookings, actionRequiredBookings, historyBookings } = useMemo(() => {
+    const stationById = useMemo(() => {
+        const map = new Map<string, any>();
+        (stations || []).forEach((s: any) => {
+            if (s?.stationId) map.set(s.stationId, s);
+        });
+        return map;
+    }, [stations]);
+
+    const enrichedBookings = useMemo(() => {
         const safeBookings = Array.isArray(bookings) ? bookings : [];
+        return safeBookings.map((b: any) => {
+            const st = b?.stationId ? stationById.get(b.stationId) : null;
+            if (!st) return b;
+
+            const cityName =
+                typeof st.city === 'string'
+                    ? st.city
+                    : (st.city?.name || '');
+
+            return {
+                ...b,
+                stationAddress: b.stationAddress || st.address,
+                stationCity: b.stationCity || cityName,
+            };
+        });
+    }, [bookings, stationById]);
+
+    const { activeBookings, reservedBookings, actionRequiredBookings, historyBookings } = useMemo(() => {
+        const safeBookings = Array.isArray(enrichedBookings) ? enrichedBookings : [];
         const active: any[] = [];
         const reserved: any[] = [];
         const action: any[] = [];
@@ -63,7 +92,7 @@ export default function MyBookingsPage() {
             actionRequiredBookings: action,
             historyBookings: history,
         };
-    }, [bookings, now]);
+    }, [enrichedBookings, now]);
 
     const renderEmptyState = (type: 'active' | 'reserved' | 'action' | 'history') => {
         let message = "";

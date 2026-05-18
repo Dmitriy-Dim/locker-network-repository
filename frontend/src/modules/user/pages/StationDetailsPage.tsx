@@ -45,6 +45,9 @@ export function StationDetailsPage() {
         return { size, count: boxesOfSize.length, price };
     }).filter(Boolean);
 
+    const cityName = typeof station?.city === 'string' ? station.city : (station?.city?.name || '');
+    const stationLabel = cityName ? `${cityName} · ${station?.address ?? ''}` : (station?.address ?? '');
+
     return (
         <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '900px', margin: '0 auto', pt: '100px' }}>
             <Button
@@ -57,10 +60,7 @@ export function StationDetailsPage() {
 
             <Box mb={4}>
                 <Typography variant="h3" fontWeight={900}>
-                    {station?.address}
-                </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ mt: 1 }}>
-                    {typeof station?.city === 'string' ? station.city : (station?.city?.name || "Unknown City")}
+                    {stationLabel}
                 </Typography>
             </Box>
 
