@@ -17,7 +17,7 @@ devicesRoutes.post('/open-locker', authorize(Role.USER), validateRequest(userDev
 devicesRoutes.post('/close-locker', authorize(Role.USER), validateRequest(userDeviceOpenCloseSchema), deviceController.closeDeviceUser);
 
 // User locker replace
-//devicesRoutes.post('/replace-locker');
+//devicesRoutes.post('/replace-locker', authorize(Role.USER));
 
 
 // Operator actions
