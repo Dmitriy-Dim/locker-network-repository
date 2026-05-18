@@ -18,7 +18,8 @@ Example `200 OK` response:
         "phone": "+972501112233",
         "role": "USER",
         "createdAt": "2026-05-10T16:55:44.174Z",
-        "updatedAt": "2026-05-10T16:55:44.174Z"
+        "updatedAt": "2026-05-10T16:55:44.174Z",
+        "isDeleted": false
     },
     {
         "userId": "1237e868-ce6f-496e-b0f8-d4f013f9d86a",
@@ -27,7 +28,8 @@ Example `200 OK` response:
         "phone": "+972585326999",
         "role": "USER",
         "createdAt": "2026-04-09T19:31:14.464Z",
-        "updatedAt": "2026-04-28T10:42:47.169Z"
+        "updatedAt": "2026-04-28T10:42:47.169Z",
+      "isDeleted": true
     },
     {
         "userId": "17242686-d064-4ea8-816a-183c1f867f1f",
@@ -36,7 +38,8 @@ Example `200 OK` response:
         "phone": null,
         "role": "OPERATOR",
         "createdAt": "2026-04-09T16:58:39.523Z",
-        "updatedAt": "2026-04-09T16:58:39.523Z"
+        "updatedAt": "2026-04-09T16:58:39.523Z",
+      "isDeleted": false
     },
     {
         "userId": "3291b113-acb7-44af-b63c-799723e629c3",
@@ -45,7 +48,8 @@ Example `200 OK` response:
         "phone": null,
         "role": "ADMIN",
         "createdAt": "2026-04-09T16:56:53.631Z",
-        "updatedAt": "2026-04-28T10:42:43.849Z"
+        "updatedAt": "2026-04-28T10:42:43.849Z",
+      "isDeleted": false
     }
 ]
 ```
