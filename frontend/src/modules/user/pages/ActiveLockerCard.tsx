@@ -12,19 +12,12 @@ import LockIcon from '@mui/icons-material/Lock';
 import PaymentIcon from '@mui/icons-material/Payment';
 import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-<<<<<<< Updated upstream
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "../../../api/apiClient.ts";
-import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking.ts";
-import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
-import { stationsApi } from "../../../api/stationsApi.ts";
-import { lockersApi } from "../../../api/lockersApi.ts";
-=======
-import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../api/apiClient";
 import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking";
 import { useDeviceOperation } from "../../../hooks/useDeviceOperation";
->>>>>>> Stashed changes
+import { stationsApi } from "../../../api/stationsApi";
+import { lockersApi } from "../../../api/lockersApi";
 
 
 function shortId(id: string | undefined) {
