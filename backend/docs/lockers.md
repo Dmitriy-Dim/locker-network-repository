@@ -270,6 +270,58 @@ Responses:
 - `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
 - `500 Internal Server Error` - projection build failed or unexpected repository/service failure
 
+#### PATCH /api/v1/lockers/admin/boxes/:id/status
+#### PATCH /api/v1/lockers/oper/boxes/:id/status
+
+- Admin route roles: admin
+- Operator route roles: operator
+- Updates locker runtime status in RDS
+- Enqueues updated locker projection to the cache projection queue
+- Rewrites station cache projection after the locker update
+- Runtime status is separate from `techStatus`; use the tech-status endpoint for lifecycle state such as maintenance or inactive
+
+Request body:
+
+```json
+{
+  "status": "AVAILABLE"
+}
+```
+
+Allowed values:
+
+```text
+AVAILABLE | RESERVED | OCCUPIED | FAULTY | EXPIRED
+```
+
+Example `200 OK` body:
+
+```json
+{
+  "success": true,
+  "correlationId": "cf0a4d6d-4dda-455c-b23d-f5ee7c555555",
+  "data": {
+    "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+    "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+    "status": "AVAILABLE"
+  },
+  "meta": {
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
+  }
+}
+```
+
+Responses:
+
+- `200 OK` - locker runtime status changed
+- `400 Bad Request` - invalid UUID, invalid status, invalid transition, same status, inactive station, inactive tech status, or locker is deleted
+- `401 Unauthorized` - missing bearer token or invalid token
+- `403 Forbidden` - authenticated user does not have the route role
+- `404 Not Found` - locker does not exist
+- `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
+- `500 Internal Server Error` - projection build failed or unexpected repository/service failure
+
 #### PATCH /api/v1/lockers/oper/boxes/:id/tech-status
 
 - Roles: operator
@@ -278,7 +330,7 @@ Responses:
 - Enqueues updated locker projection to the cache projection queue after the RDS update
 - If `techStatus !== "ACTIVE"`, backend sets `status = null`
 - If `techStatus === "ACTIVE"` and `status == null`, backend sets `status = "AVAILABLE"`
-- The old admin/operator `PATCH /api/v1/lockers/admin/boxes/:id/status` route is no longer published; user runtime status changes are driven by booking flows
+- Runtime status changes are available through `PATCH /api/v1/lockers/admin/boxes/:id/status` for admins and `PATCH /api/v1/lockers/oper/boxes/:id/status` for operators
 - The old `READY` locker technical status is removed and must not be sent by clients
 
 Request body:

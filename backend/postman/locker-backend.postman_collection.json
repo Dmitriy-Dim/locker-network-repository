@@ -133,6 +133,10 @@
     {
       "key": "lastResponseJson",
       "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
     }
   ],
   "item": [
@@ -204,6 +208,31 @@
           }
         },
         {
+          "name": "POST /api/v1/operations/health",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-api-health"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/health",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
           "name": "GET /operations/:id",
           "request": {
             "method": "GET",
@@ -223,6 +252,19 @@
                 "{{operationId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "GET /api/v1/operations/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/{{operationId}}"
           }
         },
         {
@@ -931,6 +973,31 @@
           }
         },
         {
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-admin-box-status"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"AVAILABLE\"\n}"
+            }
+          }
+        },
+        {
           "name": "PATCH /api/v1/lockers/oper/boxes/:id/tech-status ACTIVE",
           "request": {
             "method": "PATCH",
@@ -1044,6 +1111,31 @@
                 "{{lockerBoxId}}",
                 "tech-status"
               ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/lockers/oper/boxes/:id/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-oper-box-status"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/lockers/oper/boxes/{{lockerBoxId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"FAULTY\"\n}"
             }
           }
         },
@@ -1182,6 +1274,31 @@
           }
         },
         {
+          "name": "PATCH /api/v1/lockers/admin/stations/:id/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-admin-station-status"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/lockers/admin/stations/{{stationId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}"
+            }
+          }
+        },
+        {
           "name": "PATCH /api/v1/lockers/oper/stations/:id/status",
           "request": {
             "method": "PATCH",
@@ -1249,6 +1366,19 @@
                 "resync-cache"
               ]
             }
+          }
+        },
+        {
+          "name": "POST /api/v1/lockers/admin/stations/:id/hard-resync-cache",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/lockers/admin/stations/{{stationId}}/hard-resync-cache"
           }
         },
         {
@@ -1604,6 +1734,19 @@
           }
         },
         {
+          "name": "GET /api/v1/bookings/:id/payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/payments"
+          }
+        },
+        {
           "name": "POST /api/v1/bookings/:id/cancel",
           "request": {
             "method": "POST",
@@ -1716,6 +1859,19 @@
                 "admin"
               ]
             }
+          }
+        },
+        {
+          "name": "POST /api/v1/bookings/admin/reconcile-dynamo-rds",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/bookings/admin/reconcile-dynamo-rds"
           }
         },
         {
@@ -1861,6 +2017,32 @@
               ]
             }
           }
+        },
+        {
+          "name": "GET /api/v1/admin/payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/payments?bookingId={{bookingId}}&userId={{userId}}&status=PAID&provider=stripe&providerPaymentId=&from={{from}}&to={{to}}&limit={{limit}}&skip={{skip}}"
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/payments/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/payments/{{paymentId}}"
+          }
         }
       ]
     },
@@ -1922,6 +2104,53 @@
                 "users"
               ]
             }
+          }
+        },
+        {
+          "name": "GET /api/v1/admin/users/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{adminUserId}}"
+          }
+        },
+        {
+          "name": "DELETE /api/v1/admin/users/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-delete-user"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{adminUserId}}"
+          }
+        },
+        {
+          "name": "PATCH /api/v1/admin/users/:id/restore",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-restore-user"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/users/{{adminUserId}}/restore"
           }
         },
         {
