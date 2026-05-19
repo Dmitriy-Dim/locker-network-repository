@@ -12,102 +12,15 @@ import LockIcon from '@mui/icons-material/Lock';
 import PaymentIcon from '@mui/icons-material/Payment';
 import HourglassTopIcon from '@mui/icons-material/HourglassTop';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "../../../api/apiClient";
-import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking";
-import { useDeviceOperation } from "../../../hooks/useDeviceOperation";
-import { stationsApi } from "../../../api/stationsApi";
-import { lockersApi } from "../../../api/lockersApi";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "../../../api/apiClient.ts";
+import { getPaymentUrl, removePaymentUrl } from "../../../hooks/useBooking.ts";
+import { useDeviceOperation } from "../../../hooks/useDeviceOperation.ts";
 
 
 function shortId(id: string | undefined) {
     if (!id) return 'N/A';
     return id.slice(-8).toUpperCase();
-}
-
-function getCityName(booking: any) {
-    if (typeof booking?.stationCity === 'string' && booking.stationCity.trim()) return booking.stationCity.trim();
-    if (typeof booking?.stationCityName === 'string' && booking.stationCityName.trim()) return booking.stationCityName.trim();
-    if (typeof booking?.stationCityCode === 'string' && booking.stationCityCode.trim()) return booking.stationCityCode.trim();
-    if (typeof booking?.city === 'string' && booking.city.trim()) return booking.city.trim();
-    if (typeof booking?.cityName === 'string' && booking.cityName.trim()) return booking.cityName.trim();
-    if (typeof booking?.cityCode === 'string' && booking.cityCode.trim()) return booking.cityCode.trim();
-    if (typeof booking?.station?.city === 'string' && booking.station.city.trim()) return booking.station.city.trim();
-    if (typeof booking?.station?.city?.name === 'string' && booking.station.city.name.trim()) return booking.station.city.name.trim();
-    if (typeof booking?.station?.city?.code === 'string' && booking.station.city.code.trim()) return booking.station.city.code.trim();
-    return '';
-}
-
-function extractCityFromAny(source: any): string {
-    if (!source) return '';
-    const candidates = [
-        source?.stationCity,
-        source?.stationCityName,
-        source?.stationCityCode,
-        source?.city,
-        source?.cityName,
-        source?.cityCode,
-        source?.station?.city,
-        source?.station?.city?.name,
-        source?.station?.city?.code,
-    ];
-    for (const c of candidates) {
-        if (typeof c === 'string' && c.trim()) return c.trim();
-    }
-    return '';
-}
-
-function formatStationLabel(booking: any, fallbackStationId?: string) {
-    const address = booking?.stationAddress || booking?.station?.address || `Station ${shortId(fallbackStationId || booking?.stationId)}`;
-    const city = getCityName(booking);
-    return city ? `${city} · ${address}` : address;
-}
-
-function useResolvedStationLabel(booking: any, fallbackStationId?: string) {
-    const stationId = fallbackStationId || booking?.stationId;
-    const lockerBoxId = booking?.lockerBoxId;
-    const hasCityInBooking = !!getCityName(booking);
-
-    const { data: station } = useQuery({
-        queryKey: ['station-by-id-for-booking-card', stationId],
-        queryFn: () => stationsApi.getStationById(stationId),
-        enabled: !!stationId && !hasCityInBooking,
-        staleTime: 5 * 60 * 1000,
-    });
-
-    const { data: lockerDetails } = useQuery({
-        queryKey: ['locker-by-id-for-booking-card', lockerBoxId],
-        queryFn: () => lockersApi.getLockerById(lockerBoxId),
-        enabled: !!lockerBoxId && !hasCityInBooking,
-        staleTime: 5 * 60 * 1000,
-    });
-
-    const { data: stationLockers } = useQuery({
-        queryKey: ['lockers-by-station-for-booking-card', stationId],
-        queryFn: () => lockersApi.getLockers({ stationId }),
-        enabled: !!stationId && !hasCityInBooking,
-        staleTime: 5 * 60 * 1000,
-    });
-
-    if (hasCityInBooking) {
-        return formatStationLabel(booking, fallbackStationId);
-    }
-
-    const cityFromLocker = extractCityFromAny(lockerDetails);
-    const cityFromStationLockers =
-        Array.isArray(stationLockers)
-            ? (extractCityFromAny(stationLockers[0]) || extractCityFromAny((stationLockers as any[]).find((l) => extractCityFromAny(l))))
-            : '';
-    const cityFromStation = extractCityFromAny(station);
-
-    const cityName = cityFromLocker || cityFromStationLockers || cityFromStation;
-    const address =
-        booking?.stationAddress
-        || (lockerDetails as any)?.station?.address
-        || station?.address
-        || `Station ${shortId(stationId)}`;
-
-    return cityName ? `${cityName} · ${address}` : address;
 }
 
 
@@ -162,7 +75,7 @@ function ReservedLockerCard({ booking }: { booking: any }) {
         return () => clearInterval(t);
     }, [expiresAt]);
 
-    const address = useResolvedStationLabel(booking, stationId);
+    const address = booking.stationAddress || `Station ${shortId(stationId)}`;
 
     const handleRepay = async () => {
         if (!bookingId) return;
@@ -331,7 +244,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     if (isHidden) return null;
 
     const lockerCode = booking.code || '—';
-    const address = useResolvedStationLabel(booking, stationId);
+    const address = booking.stationAddress || `Station ${shortId(stationId)}`;
     const isActive = ['ACTIVE', 'PAID'].includes(booking.bookingStatus);
 
     const accentColor = timerStatus === 'heavilyOverdue' ? '#dc2626' : timerStatus === 'expired' ? '#f59e0b' : '#16a34a';
@@ -531,7 +444,7 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
 // ---------------------------------------------------------------------------
 export function ActionRequiredLockerCard({ booking }: { booking: any }) {
     const [now] = useState(() => Date.now());
-    const address = useResolvedStationLabel(booking, booking.stationId);
+    const address = booking.stationAddress || `Station ${shortId(booking.stationId)}`;
     const endTime = booking.expectedEndTime ? new Date(booking.expectedEndTime).getTime() : null;
     const isHeavilyOverdue = endTime !== null && (now - endTime) > 8 * 60 * 60 * 1000;
     const endDateStr = booking.expectedEndTime
@@ -599,7 +512,7 @@ export function ActionRequiredLockerCard({ booking }: { booking: any }) {
 // History
 // ---------------------------------------------------------------------------
 export function HistoryLockerCard({ booking }: { booking: any }) {
-    const address = useResolvedStationLabel(booking, booking.stationId);
+    const address = booking.stationAddress || `Station ${shortId(booking.stationId)}`;
 
     const statusLabel: Record<string, string> = {
         CANCELLED: 'Cancelled', COMPLETED: 'Completed', ENDED: 'Ended',
