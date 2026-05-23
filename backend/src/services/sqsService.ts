@@ -357,3 +357,21 @@ export async function enqueueLockerProjectionDelete(
         },
     });
 }
+
+export type ReplaceLockerCommand = {
+    operationId: string;
+    type: OperationType.LOCKER_REPLACE;
+    payload: {
+        userId: string;
+        bookingId: string;
+        stationId: string;
+        lockerBoxId: string;
+
+        failedOperationId?: string;
+        failedOperationType?: OperationType.LOCKER_OPEN | OperationType.LOCKER_CLOSE;
+        reason?: string;
+
+        clientRequestId?: string;
+        requestedAt: string;
+    };
+};
