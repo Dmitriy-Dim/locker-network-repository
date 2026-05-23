@@ -375,3 +375,7 @@ export type ReplaceLockerCommand = {
         requestedAt: string;
     };
 };
+
+export async function sendReplaceLockerCommand(command: ReplaceLockerCommand) {
+    return sendCommandToQueue(command);
+}

@@ -1,4 +1,26 @@
 import {z} from "zod";
+import {OperationType} from "../services/dto/operationDto";
+
+
+export const replaceLockerSchema = z.object({
+    body: z.object({
+        bookingId: z.uuid("bookingId is wrong"),
+        stationId: z.uuid("stationId is wrong"),
+        lockerBoxId: z.uuid("lockerBoxId is wrong"),
+
+        failedOperationId: z.uuid("failedOperationId is wrong").optional(),
+
+        failedOperationType: z
+            .union([
+                z.literal(OperationType.LOCKER_OPEN),
+                z.literal(OperationType.LOCKER_CLOSE),
+            ])
+            .optional(),
+
+        reason: z.string().optional(),
+        clientRequestId: z.string().optional(),
+    }),
+});
 
 export const userDeviceOpenCloseSchema = z.object({
     body: z.object({
