@@ -11,6 +11,7 @@ export enum OperationType {
   LOCKER_CLOSE = 'LOCKER_CLOSE',
   LOCKER_OPEN_BATCH = 'LOCKER_OPEN_BATCH',
   LOCKER_CLOSE_BATCH = 'LOCKER_CLOSE_BATCH',
+  LOCKER_REPLACE = 'LOCKER_REPLACE',
 }
 
 export enum OperationStatus {
@@ -73,4 +74,34 @@ export interface LockerBatchCommand {
   operationId: string;
   type: OperationType.LOCKER_OPEN_BATCH | OperationType.LOCKER_CLOSE_BATCH;
   payload: LockerBatchCommandPayload;
+}
+
+export interface LockerReplaceCommandPayload {
+  userId: string;
+  bookingId: string;
+  stationId: string;
+  lockerBoxId: string;
+  failedOperationId: string;
+  failedOperationType: string;
+  reason: string;
+  clientRequestId?: string;
+  requestedAt: string;
+}
+
+export interface LockerReplaceCommand {
+  operationId: string;
+  type: OperationType.LOCKER_REPLACE;
+  payload: LockerReplaceCommandPayload;
+}
+
+export interface LockerReplaceResult {
+  oldLockerBoxId: string;
+  newLockerBoxId: string;
+  stationId: string;
+  bookingId: string;
+  reason: string;
+  failedOperationId: string;
+  failedOperationType: string;
+  nextAction: 'OPEN_NEW_LOCKER';
+  message: string;
 }
