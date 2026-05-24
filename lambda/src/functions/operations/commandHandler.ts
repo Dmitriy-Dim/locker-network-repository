@@ -1,5 +1,5 @@
 import { SQSEvent } from 'aws-lambda';
-import { SQSCommand, OperationType, OperationStatus, LockerCommand } from '../../types/contracts/OperationContracts';
+import { SQSCommand, OperationType, OperationStatus, LockerCommand, LockerReplaceCommand } from '../../types/contracts/OperationContracts';
 import { SecurityEventPayload } from '../../types/contracts/SecurityEventContracts';
 import { updateOperationStatus } from '../../db/dynamodb';
 import { handleHealthCheck } from './lambdaHealthService';
@@ -15,6 +15,7 @@ import { handleBookingExtendConfirm } from '../booking/bookingExtendConfirmServi
 import { BookingExtendConfirmCommand } from '../../types/contracts/BookingContracts';
 import { handleBookingInit } from '../booking/bookingInitService';
 import { handleLockerOpen, handleLockerClose, handleLockerOpenBatch, handleLockerCloseBatch } from './lockerCommandService';
+import { handleLockerReplace } from './lockerReplaceService';
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -80,6 +81,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         case OperationType.LOCKER_CLOSE_BATCH:
           await handleLockerCloseBatch(command as unknown as LockerBatchCommand);
+          break;
+
+        case OperationType.LOCKER_REPLACE:
+          await handleLockerReplace(command as unknown as LockerReplaceCommand);
           break;
 
         default:
