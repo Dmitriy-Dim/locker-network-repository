@@ -261,6 +261,60 @@ export const updateBookingStatus = async (
   }));
 };
  
+// ─── Atomic transaction: replace broken locker ───
+
+export const atomicLockerReplace = async (
+  bookingId: string,
+  oldLockerBoxId: string,
+  newLockerBoxId: string,
+) => {
+  const now = new Date().toISOString();
+
+  await docClient.send(new TransactWriteCommand({
+    TransactItems: [
+      {
+        Update: {
+          TableName: LOCKER_CACHE_TABLE,
+          Key: { lockerBoxId: oldLockerBoxId },
+          UpdateExpression: 'SET #s = :faulty, lastStatusChangedAt = :now, version = version + :inc',
+          ExpressionAttributeNames: { '#s': 'status' },
+          ExpressionAttributeValues: {
+            ':faulty': 'FAULTY',
+            ':now': now,
+            ':inc': 1,
+          },
+        },
+      },
+      {
+        Update: {
+          TableName: LOCKER_CACHE_TABLE,
+          Key: { lockerBoxId: newLockerBoxId },
+          UpdateExpression: 'SET #s = :reserved, lastStatusChangedAt = :now, version = version + :inc',
+          ConditionExpression: '#s = :available',
+          ExpressionAttributeNames: { '#s': 'status' },
+          ExpressionAttributeValues: {
+            ':reserved': 'RESERVED',
+            ':available': 'AVAILABLE',
+            ':now': now,
+            ':inc': 1,
+          },
+        },
+      },
+      {
+        Update: {
+          TableName: BOOKING_TABLE,
+          Key: { bookingId },
+          UpdateExpression: 'SET lockerBoxId = :newLockerBoxId, updatedAt = :now',
+          ExpressionAttributeValues: {
+            ':newLockerBoxId': newLockerBoxId,
+            ':now': now,
+          },
+        },
+      },
+    ],
+  }));
+};
+
 // ─── Atomic transaction: create booking + reserve locker + update operation ───
  
 export const atomicBookingInit = async (
