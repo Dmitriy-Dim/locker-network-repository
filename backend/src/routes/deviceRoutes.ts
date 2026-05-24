@@ -6,12 +6,18 @@ import * as auth from "../middleware/authMiddleware";
 import {authorize} from "../middleware/authMiddleware";
 import {validateRequest} from "../middleware/validateRequest";
 import {operDeviceOpenCloseSchema, userDeviceOpenCloseSchema} from "../validation/devicesSchema";
+import { replaceLockerSchema } from "../validation/devicesSchema";
 
 
 export const devicesRoutes = express.Router();
 
 
 devicesRoutes.use(auth.protect)
+
+// Replace locker
+
+devicesRoutes.post("/replace-locker", authorize(Role.USER), validateRequest(replaceLockerSchema), deviceController.replaceLockerUser);
+
 // User actions
 devicesRoutes.post('/open-locker', authorize(Role.USER), validateRequest(userDeviceOpenCloseSchema), deviceController.openDeviceUser);
 devicesRoutes.post('/close-locker', authorize(Role.USER), validateRequest(userDeviceOpenCloseSchema), deviceController.closeDeviceUser);

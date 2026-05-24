@@ -2,7 +2,13 @@ import { NextFunction, Request, Response } from "express";
 
 import {deviceService} from "../services/DeviceService";
 
-
+export const replaceLockerUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await deviceService.replaceLockerUser(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
 
 export const openDeviceUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
