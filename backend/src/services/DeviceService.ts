@@ -17,6 +17,58 @@ import {
 } from "./sqsService";
 import {getBooking} from "./dynamoService";
 import {loadLockers, toLockerResponse} from "./lockerBox/lockerBoxService.helpers";
+import { sendReplaceLockerCommand } from "./sqsService";
+import { randomUUID } from "crypto";
+
+async function replaceLockerUser(req: Request, res: Response) {
+    const userId = req.user?.userId;
+    if (!userId) {
+        throw new HttpError(401, "Unauthorized");
+    }
+    const {
+        bookingId,
+        stationId,
+        lockerBoxId,
+        failedOperationId,
+        failedOperationType,
+        reason,
+        clientRequestId,
+    } = req.body;
+
+    const operationId = randomUUID();
+    const requestedAt = new Date().toISOString();
+
+    await operationRepository.create({
+        operationId,
+        userId,
+        timestamp: requestedAt,
+        status: OperationStatus.PENDING,
+        type: OperationType.LOCKER_REPLACE,
+    });
+
+    await sendReplaceLockerCommand({
+        operationId,
+        type: OperationType.LOCKER_REPLACE,
+        payload: {
+            userId,
+            bookingId,
+            stationId,
+            lockerBoxId,
+            failedOperationId,
+            failedOperationType,
+            reason,
+            clientRequestId,
+            requestedAt,
+        },
+    });
+
+    return res.status(202).json({
+        operationId,
+        status: OperationStatus.PENDING,
+        type: OperationType.LOCKER_REPLACE,
+        message: "Locker replace command accepted",
+    });
+}
 
 
 

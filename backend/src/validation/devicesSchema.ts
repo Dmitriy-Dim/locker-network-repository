@@ -7,16 +7,13 @@ export const replaceLockerSchema = z.object({
         bookingId: z.uuid("bookingId is wrong"),
         stationId: z.uuid("stationId is wrong"),
         lockerBoxId: z.uuid("lockerBoxId is wrong"),
-
         failedOperationId: z.uuid("failedOperationId is wrong").optional(),
-
         failedOperationType: z
             .union([
                 z.literal(OperationType.LOCKER_OPEN),
                 z.literal(OperationType.LOCKER_CLOSE),
             ])
             .optional(),
-
         reason: z.string().optional(),
         clientRequestId: z.string().optional(),
     }),
