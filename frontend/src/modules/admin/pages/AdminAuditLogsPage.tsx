@@ -79,7 +79,8 @@ function IdCell({ id, onClick }: { id: string; onClick?: () => void }) {
     );
 }
 
-function ActorInfo({ actorId, cache, loadActor }: { actorId: string; cache: React.MutableRefObject<Record<string, AdminUser | 'loading' | 'error'>>; loadActor: (id: string) => void }) {
+function ActorInfo({ actorId, cache, loadActor }: { actorId: string | null; cache: React.MutableRefObject<Record<string, AdminUser | 'loading' | 'error'>>; loadActor: (id: string) => void }) {
+    if (!actorId) return null;
     const entry = cache.current[actorId];
     if (!entry) { loadActor(actorId); return null; }
     if (entry === 'loading') return <CircularProgress size={10} />;
@@ -119,6 +120,7 @@ function EntityInfo({ entityType, entityId, cache, loadActor }: {
 /** Builds a human-readable one-line summary of what happened */
 function buildActionSummary(log: AuditLogEntry, cache: Record<string, AdminUser | 'loading' | 'error'>): string | null {
     const actorName = (() => {
+        if (!log.actorId) return null; // FIX: guard against null actorId
         const a = cache[log.actorId];
         return a && typeof a === 'object' ? (a.name ?? a.email) : null;
     })();
@@ -128,7 +130,7 @@ function buildActionSummary(log: AuditLogEntry, cache: Record<string, AdminUser 
         return e && typeof e === 'object' ? (e.name ?? e.email) : null;
     })();
 
-    const actor = actorName ?? `Actor ${log.actorId.slice(0, 8)}…`;
+    const actor = actorName ?? (log.actorId ? `Actor ${log.actorId.slice(0, 8)}…` : 'System');
     const entity = entityName ? `"${entityName}"` : `${log.entityType} ${log.entityId.slice(0, 8)}…`;
 
     switch (true) {
@@ -189,8 +191,14 @@ function ExpandableRow({ log, onFilterActor, onFilterEntity, actorCache, loadAct
                     <EntityInfo entityType={log.entityType} entityId={log.entityId} cache={actorCache} loadActor={loadActor} />
                 </TableCell>
                 <TableCell>
-                    <IdCell id={log.actorId} onClick={() => onFilterActor(log.actorId)} />
-                    <ActorInfo actorId={log.actorId} cache={actorCache} loadActor={loadActor} />
+                    {log.actorId ? (
+                        <>
+                            <IdCell id={log.actorId} onClick={() => onFilterActor(log.actorId!)} />
+                            <ActorInfo actorId={log.actorId} cache={actorCache} loadActor={loadActor} />
+                        </>
+                    ) : (
+                        <Typography variant="caption" color="text.disabled" fontSize={10}>System</Typography>
+                    )}
                 </TableCell>
                 <TableCell>
                     {hasDetails ? (
@@ -251,6 +259,7 @@ export default function AdminAuditLogsPage() {
     const { logs, meta, isLoading, isError } = useAuditLogs(filters);
 
     const loadActor = useCallback((actorId: string) => {
+        if (!actorId) return; // FIX: guard against null/empty actorId — prevents 404 on /admin/users/null
         if (actorCache.current[actorId]) return;
         actorCache.current[actorId] = 'loading';
         adminUsersApi.getById(actorId)
@@ -273,9 +282,7 @@ export default function AdminAuditLogsPage() {
     const displayLogs = localSearch
         ? logs.filter((log) => {
             const q = localSearch.toLowerCase();
-            const actor = actorCache.current[log.actorId];
-            const actorText = actor && typeof actor === 'object' ? `${actor.name} ${actor.email} ${actor.role}` : '';
-            return [log.action, log.entityType, log.entityId, log.actorId, log.lockerId ?? '', log.createdAt, actorText, log.details ? JSON.stringify(log.details) : ''].join(' ').toLowerCase().includes(q);
+            return [log.action, log.entityType, log.entityId, log.actorId ?? '', log.lockerId ?? '', log.createdAt, log.details ? JSON.stringify(log.details) : ''].join(' ').toLowerCase().includes(q);
         })
         : logs;
 
