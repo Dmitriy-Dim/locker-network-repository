@@ -41,6 +41,28 @@ Backend (after polling SUCCESS/FAILED):
   └── Update BookingTable status
 ```
 
+### Locker replace flow
+
+```
+Backend (after LOCKER_OPEN/CLOSE failed for active booking)
+  → SQS: { operationId, type: LOCKER_REPLACE, payload: { userId, bookingId, stationId, lockerBoxId (broken),
+            failedOperationId, failedOperationType, reason, clientRequestId?, requestedAt } }
+
+CommandHandler → lockerReplaceService
+  ├── Load booking from BookingTable
+  │     ├── not found                                                       → FAILED (BOOKING_NOT_FOUND)
+  │     └── userId/stationId/lockerBoxId mismatch                           → FAILED (LOCKER_BOOKING_MISMATCH)
+  ├── findAvailableLocker(stationId, booking.size)
+  │     └── no candidate                                                    → FAILED (NO_AVAILABLE_REPLACEMENT_LOCKER)
+  ├── TransactWrite (atomic):
+  │     ├── LockerCacheTable[oldLockerBoxId].status = FAULTY
+  │     ├── LockerCacheTable[newLockerBoxId].status = RESERVED  (cond: status = AVAILABLE)
+  │     └── BookingTable[bookingId].lockerBoxId = newLockerBoxId, updatedAt = now
+  │     └── on race (someone took the new locker) → retry up to 3 times
+  └── On success:
+        └── OperationsTable: SUCCESS with LockerReplaceResult (nextAction: OPEN_NEW_LOCKER)
+```
+
 ### Booking end flow
 
 ```
@@ -108,6 +130,7 @@ lambda/
 │   │       ├── lambdaHealthService.ts        # HEALTH_CHECK command handler
 │   │       ├── securityEventService.ts       # SECURITY_EVENT command handler
 │   │       ├── lockerCommandService.ts       # LOCKER_OPEN/CLOSE + batch variants
+│   │       ├── lockerReplaceService.ts       # LOCKER_REPLACE — swap broken locker
 │   │       └── lockerDeviceSimulator.ts      # IoT device stub (swap for real HTTP in prod)
 │   ├── db/
 │   │   └── dynamodb.ts                       # DynamoDB client + all table operations
@@ -152,6 +175,7 @@ lambda/
 | `LOCKER_CLOSE` | `lockerCommandService` | Close and lock locker via device |
 | `LOCKER_OPEN_BATCH` | `lockerCommandService` | Batch open (operator/admin maintenance) |
 | `LOCKER_CLOSE_BATCH` | `lockerCommandService` | Batch close (operator/admin maintenance) |
+| `LOCKER_REPLACE` | `lockerReplaceService` | Swap broken locker for a free one of the same size, reassign booking |
 
 ## DynamoDB Tables
 
@@ -302,6 +326,7 @@ PENDING → PROCESSING → SUCCESS | FAILED
 | `CLOSE_ATTEMPTS_EXHAUSTED` | System | All retry attempts to close failed |
 | `BATCH_OPEN_FAILED` | System | Batch open operation failed |
 | `BATCH_CLOSE_FAILED` | System | Batch close operation failed |
+| `NO_AVAILABLE_REPLACEMENT_LOCKER` | System | No free locker of same size to replace broken one |
 
 ## CloudWatch Logs
 
