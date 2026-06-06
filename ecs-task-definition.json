@@ -1,0 +1,74 @@
+{
+  "family": "locker-backend-td",
+  "executionRoleArn": "arn:aws:iam::987343905300:role/locker-ecs-task-role",
+  "taskRoleArn": "arn:aws:iam::987343905300:role/locker-ecs-task-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "locker-backend",
+      "image": "987343905300.dkr.ecr.us-east-1.amazonaws.com/locker-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3555,
+          "hostPort": 3555,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3555" },
+        { "name": "SERVER_URL", "value": "http://locker-alb-1860959554.us-east-1.elb.amazonaws.com" },
+        { "name": "FRONTEND_URL", "value": "https://main.d3qn8rmvu6tqrp.amplifyapp.com" },
+        { "name": "FRONTEND_LOCAL_URL", "value": "https://main.d3qn8rmvu6tqrp.amplifyapp.com" },
+        { "name": "POSTGRES_HOST", "value": "locker-postgres.c83i4yiguf2t.us-east-1.rds.amazonaws.com" },
+        { "name": "POSTGRES_PORT", "value": "5432" },
+        { "name": "POSTGRES_USER", "value": "root" },
+        { "name": "JWT_ACCESS_EXPIRES_IN", "value": "15m" },
+        { "name": "JWT_ACCESS_TOKEN_TTL", "value": "15" },
+        { "name": "JWT_REFRESH_EXPIRES_IN", "value": "7d" },
+        { "name": "JWT_REFRESH_TOKEN_TTL", "value": "7" },
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "OPERATIONS_QUEUE_URL", "value": "https://sqs.us-east-1.amazonaws.com/987343905300/locker-prod-operations-queue" },
+        { "name": "CACHE_PROJECTION_QUEUE_URL", "value": "https://sqs.us-east-1.amazonaws.com/987343905300/locker-prod-cache-projection" },
+        { "name": "SQS_URL", "value": "https://sqs.us-east-1.amazonaws.com/987343905300/locker-prod-operations-queue" },
+        { "name": "DYNAMO_TABLE_NAME", "value": "locker-prod-operations-dynamodb" },
+        { "name": "DYNAMO_BOOKINGS_TABLE_NAME", "value": "locker-prod-booking" },
+        { "name": "DYNAMO_LOCKER_CACHE_TABLE_NAME", "value": "locker-prod-locker-cache" },
+        { "name": "DYNAMO_DEVICE_STATE_TABLE_NAME", "value": "locker-prod-device-state" },
+        { "name": "LOG_LEVEL", "value": "info" },
+        { "name": "USE_LAMBDA_HEALTH", "value": "false" },
+        { "name": "BOOKING_EXPIRATION_DISABLED", "value": "false" },
+        { "name": "BOOKING_EXPIRATION_INTERVAL_MS", "value": "60000" },
+        { "name": "BOOKING_EXPIRATION_BATCH_SIZE", "value": "100" },
+        { "name": "GOOGLE_CLIENT_ID", "value": "960225258387-ohej5vrb992bcggeka1s3osahsqqa7q1.apps.googleusercontent.com" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/database-url-a8vqex" },
+        { "name": "POSTGRES_PASSWORD", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/database-url-a8vqex" },
+        { "name": "JWT_ACCESS_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/jwt-access-secret-z2jskt" },
+        { "name": "JWT_REFRESH_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/jwt-refresh-secret-3AWKop" },
+        { "name": "STRIPE_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/stripe-secret-key-fM0EEc" },
+        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/stripe-webhook-secret-V4zOH6" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/locker-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3555/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

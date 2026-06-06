@@ -1,0 +1,70 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-operations-dynamodb",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-booking",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-locker-cache",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-device-state",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-operations-dynamodb/index/*",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-booking/index/*",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-locker-cache/index/*",
+        "arn:aws:dynamodb:us-east-1:987343905300:table/locker-prod-device-state/index/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sqs:SendMessage",
+        "sqs:GetQueueUrl"
+      ],
+      "Resource": [
+        "arn:aws:sqs:us-east-1:987343905300:locker-prod-operations-queue",
+        "arn:aws:sqs:us-east-1:987343905300:locker-prod-cache-projection"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:987343905300:log-group:/ecs/locker-backend:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/database-url-*",
+        "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/jwt-access-secret-*",
+        "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/jwt-refresh-secret-*",
+        "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/stripe-secret-key-*",
+        "arn:aws:secretsmanager:us-east-1:987343905300:secret:locker/stripe-webhook-secret-*"
+      ]
+    }
+  ]
+}

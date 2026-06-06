@@ -7,7 +7,8 @@ frontend:
         - npm ci
     build:
       commands:
-        - npm run build
+        - cd frontend
+        - VITE_API_URL_BACKEND=http://locker-alb-1860959554.us-east-1.elb.amazonaws.com/api/v1 VITE_GOOGLE_CLIENT_ID=960225258387-ohej5vrb992bcggeka1s3osahsqqa7q1.apps.googleusercontent.com npm run build
   artifacts:
     baseDirectory: frontend/dist
     files:
